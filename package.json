@@ -1,0 +1,33 @@
+{
+  "private": true,
+  "name": "jumbo-contracts",
+  "version": "1.0.0",
+  "description": "Jumbo smart contracts",
+  "main": "truffle-config.js",
+  "directories": {
+    "test": "test"
+  },
+  "scripts": {
+    "dev": "lite-server",
+    "test": "echo \"Error: no test specified\" && exit 1"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://jaumevn@github.com/creativehothouse/jumbo-contracts.git"
+  },
+  "author": "",
+  "license": "ISC",
+  "bugs": {
+    "url": "https://github.com/creativehothouse/jumbo-contracts/issues"
+  },
+  "homepage": "https://github.com/creativehothouse/jumbo-contracts#readme",
+  "dependencies": {
+    "bignumber.js": "^5.0.0",
+    "moment": "^2.19.3",
+    "web3": "^1.0.0-beta.27",
+    "zeppelin-solidity": "1.3.0"
+  },
+  "devDependencies": {
+    "lite-server": "^2.3.0"
+  }
+}
