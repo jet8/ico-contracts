@@ -44,6 +44,8 @@ module.exports = function(deployer, network, accounts) {
     }).then(() => {
       return ledger.setOpsAddress(sale.address, { from: accounts[0] })
     }).then(() => {
+      return ledger.setAdminAddress(adminAddress, { from: accounts[0] })
+    }).then(() => {
       return custodian.setAdminAddress(adminAddress, { from: accounts[0] })
     }).then(() => {
       return token.transfer(sale.address, TOKEN_SALE_SUPPLY, { from: accounts[0]})

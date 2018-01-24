@@ -30,7 +30,7 @@ contract CrowdsaleConfig {
     uint256 public constant MAX_CONTRIBUTION_WEIS = 100000000000000000000; //100 eth
 
     //@WARNING: WORKING WITH KILO-MULTIPLES TO AVOID IMPOSSIBLE DIVISIONS OF FLOATING POINTS.
-    uint256 constant dollar_per_kilo_token = 10; //0.01 dollar per token
+    uint256 constant dollar_per_kilo_token = 100; //0.1 dollar per token
     uint256 public constant dollars_per_kilo_ether = 400000; //400$ per ether
     //TOKENS_PER_ETHER = dollars_per_ether / dollar_per_token
     uint256 public constant INITIAL_TOKENS_PER_ETHER = dollars_per_kilo_ether.div(dollar_per_kilo_token);
