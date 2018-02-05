@@ -33,4 +33,47 @@ contract('ACLManaged', function (accounts) {
         let adminAddress = await aclManaged.adminAddress()
         assert.equal(adminAddress, accounts[1]);
     });
+
+    it('isOwner', async function() {
+        let aclManaged = await ACLManaged.new();
+        let isOwner = await aclManaged.isOwner(accounts[1]);
+        assert.equal(false, isOwner);
+        isOwner = await aclManaged.isOwner(accounts[0]);
+        assert.equal(true, isOwner);
+    })
+
+    it('isOps', async function () {
+        let aclManaged = await ACLManaged.new();
+        await aclManaged.setOpsAddress(accounts[1]);
+        let isOps = await aclManaged.isOps(accounts[1]);
+        assert.equal(true, isOps);
+        isOps = await aclManaged.isOps(accounts[0]);
+        assert.equal(false, isOps);
+    })
+
+    it('isOpsOrAdmin', async function () {
+        let aclManaged = await ACLManaged.new();
+        await aclManaged.setOpsAddress(accounts[1]);
+        await aclManaged.setAdminAddress(accounts[2]);
+        let isOpsOrAdmin = await aclManaged.isOpsOrAdmin(accounts[1]);
+        assert.equal(true, isOpsOrAdmin);
+        isOpsOrAdmin = await aclManaged.isOpsOrAdmin(accounts[2]);
+        assert.equal(true, isOpsOrAdmin);
+        isOpsOrAdmin = await aclManaged.isOpsOrAdmin(accounts[0]);
+        assert.equal(false, isOpsOrAdmin);
+    })
+
+    it('isOwnerOrOpsOrAdmin', async function () {
+        let aclManaged = await ACLManaged.new();
+        await aclManaged.setOpsAddress(accounts[1]);
+        await aclManaged.setAdminAddress(accounts[2]);
+        let isOwnerOrOpsOrAdmin = await aclManaged.isOwnerOrOpsOrAdmin(accounts[1]);
+        assert.equal(true, isOwnerOrOpsOrAdmin);
+        isOwnerOrOpsOrAdmin = await aclManaged.isOwnerOrOpsOrAdmin(accounts[2]);
+        assert.equal(true, isOwnerOrOpsOrAdmin);
+        isOwnerOrOpsOrAdmin = await aclManaged.isOwnerOrOpsOrAdmin(accounts[0]);
+        assert.equal(true, isOwnerOrOpsOrAdmin);
+        isOwnerOrOpsOrAdmin = await aclManaged.isOwnerOrOpsOrAdmin(accounts[3]);
+        assert.equal(false, isOwnerOrOpsOrAdmin);
+    })
 });

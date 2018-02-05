@@ -1,13 +1,11 @@
 pragma solidity ^0.4.17;
 import './J8TToken.sol';
 import './ACLManaged.sol';
+import './J8TTokenConfig.sol';
 
-contract Custodian is ACLManaged {
+contract Custodian is ACLManaged, J8TTokenConfig {
 	
 	using SafeMath for uint256;
-
-	uint8 public constant TOKEN_DECIMALS = 8;
-    uint256 public constant J8T_DECIMALS_FACTOR = 10**uint256(TOKEN_DECIMALS);
 
     // The team token allocation is 10% of the total token supply
 	// 		team = 1500000000*0.1 = 150000000*(10**8) luckys
@@ -66,7 +64,7 @@ contract Custodian is ACLManaged {
     	currentBountySupply = BOUNTY_SUPPLY.mul(J8T_DECIMALS_FACTOR);
     }
 
-	function transferAllocation(uint256 _amount, address _wallet, AllocationType _allocationType) external onlyAdminAndOps returns (bool) {
+	function transferAllocation(uint256 _amount, address _wallet, AllocationType _allocationType) external onlyAdmin returns (bool) {
 		require(_wallet != address(0));
 		require(_amount > 0);
 		require(_allocationType == AllocationType.Team ||
@@ -104,17 +102,17 @@ contract Custodian is ACLManaged {
 		return true;
 	}
 
-	function setTeamSupply(uint256 _amount) external onlyAdminAndOps returns (bool) {
+	function setTeamSupply(uint256 _amount) external onlyAdmin returns (bool) {
         currentTeamSupply = _amount;
         return true;
     }
 
-    function setAdvisorsSupply(uint256 _amount) external onlyAdminAndOps returns (bool) {
+    function setAdvisorsSupply(uint256 _amount) external onlyAdmin returns (bool) {
         currentAdvisorsSupply = _amount;
         return true;
     }
 
-    function setBountySupply(uint256 _amount) external onlyAdminAndOps returns (bool) {
+    function setBountySupply(uint256 _amount) external onlyAdmin returns (bool) {
         currentBountySupply = _amount;
         return true;
     }

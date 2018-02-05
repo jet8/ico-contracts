@@ -34,6 +34,7 @@ contract('Crowdsale', function (accounts) {
     var accomulatedEth = new BigNumber(0);
 
     var tokensAmount = new BigNumber(40000);
+    var bonusTokensAmount = new BigNumber(15000);
 
     let token;
     let sale;
@@ -42,9 +43,9 @@ contract('Crowdsale', function (accounts) {
     describe('Whitelist Permissions', () => {
         describe('Updates', () => {
             before(async () => {
-                token = await J8TToken.new({ from: accounts[0], gas: 3500000 })
+                token = await J8TToken.new({ from: accounts[0], gas: 4500000 })
                 var totalTokens = new BigNumber(TOKEN_SALE_SUPPLY)
-                ledger = await Ledger.new(token.address, { from: accounts[0], gas: 3500000 })
+                ledger = await Ledger.new(token.address, { from: accounts[0], gas: 4500000 })
                 sale  = await Crowdsale.new(
                     token.address,
                     ledger.address,
@@ -55,7 +56,6 @@ contract('Crowdsale', function (accounts) {
                 await sale.setAdminAddress(accounts[0])
                 await sale.setStartTimestamp(START_TIME);
                 await sale.setEndTimestamp(END_TIME);
-                await sale.setSaleSupply(totalTokens);
                 await sale.setMinContribution(CONTRIBUTION_MIN);
                 await sale.setMaxContribution(CONTRIBUTION_MAX);
                 await ledger.setOpsAddress(sale.address);
@@ -101,13 +101,31 @@ contract('Crowdsale', function (accounts) {
                 }
                 assert(false, "Did not throw as expected");
             })
+
+            it('should not add batch array with invalid contributor phase', async function() {
+                let contributorPermissions = 4;
+                let contributors = [accounts[0], accounts[1], accounts[2], accounts[3], accounts[4], accounts[5]]
+                try {
+                    await sale.updateWhitelist_batch(contributors, contributorPermissions, {from: accounts[0]})
+                } catch (error) {
+                    assert(true, `Expected throw, but got ${error} instead`);
+                    return;
+                }
+                assert(false, "Did not throw as expected");
+            });
+
+            it('should add batch array', async function () {
+                let contributorPermissions = 2;
+                let contributors = [accounts[0], accounts[1], accounts[2], accounts[3], accounts[4], accounts[5]]
+                await sale.updateWhitelist_batch(contributors, contributorPermissions, {from: accounts[0]})
+            });
         });
 
         describe('Buy Tokens', () => {
             before(async () => {
-                token = await J8TToken.new({ from: accounts[0], gas: 3500000 })
+                token = await J8TToken.new({ from: accounts[0], gas: 4500000 })
                 var totalTokens = new BigNumber(TOKEN_SALE_SUPPLY)
-                ledger = await Ledger.new(token.address, { from: accounts[0], gas: 3500000 })
+                ledger = await Ledger.new(token.address, { from: accounts[0], gas: 4500000 })
                 sale  = await Crowdsale.new(
                     token.address,
                     ledger.address,
@@ -118,7 +136,6 @@ contract('Crowdsale', function (accounts) {
                 await sale.forceTokensPerEther(TOKENS_PER_ETHER);
                 await sale.setStartTimestamp(START_TIME);
                 await sale.setEndTimestamp(END_TIME);
-                await sale.setSaleSupply(totalTokens);
                 await sale.setMinContribution(CONTRIBUTION_MIN);
                 await sale.setMaxContribution(CONTRIBUTION_MAX);
                 await ledger.setOpsAddress(sale.address);
@@ -192,9 +209,9 @@ contract('Crowdsale', function (accounts) {
         describe('Add Presales', () => {
 
             before(async () => {
-                token = await J8TToken.new({ from: accounts[0], gas: 3500000 })
+                token = await J8TToken.new({ from: accounts[0], gas: 4500000 })
                 var totalTokens = new BigNumber(TOKEN_SALE_SUPPLY)
-                ledger = await Ledger.new(token.address, { from: accounts[0], gas: 3500000 })
+                ledger = await Ledger.new(token.address, { from: accounts[0], gas: 4500000 })
                 sale  = await Crowdsale.new(
                     token.address,
                     ledger.address,
@@ -205,7 +222,6 @@ contract('Crowdsale', function (accounts) {
                 await sale.forceTokensPerEther(TOKENS_PER_ETHER);
                 await sale.setStartTimestamp(START_TIME);
                 await sale.setEndTimestamp(END_TIME);
-                await sale.setSaleSupply(totalTokens);
                 await sale.setMinContribution(CONTRIBUTION_MIN);
                 await sale.setMaxContribution(CONTRIBUTION_MAX);
                 await ledger.setOpsAddress(sale.address);
@@ -217,19 +233,52 @@ contract('Crowdsale', function (accounts) {
             // Presale = 1
             // Partner = 2
 
+            it('should not add presale contribution - invalid bonus amount', async function() {
+                try {
+                    await sale.addPresale(accounts[1], tokensAmount, 0, 2, {from: accounts[0]})
+                } catch (error) {
+                    assert(true, `Expected throw, but got ${error} instead`);
+
+                    return;
+                }
+                assert(false, "Did not throw as expected");
+            });
+
+            it('should not add partner contribution with invalid amount', async function () {
+                try {
+                    await sale.addPresale(accounts[1], 0, bonusTokensAmount, 2, {from: accounts[0]})
+                } catch (error) {
+                    assert(true, `Expected throw, but got ${error} instead`);
+
+                    return;
+                }
+                assert(false, "Did not throw as expected");
+            });
+
+            it('should not add partner contribution with invalid phase', async function () {
+                try {
+                    await sale.addPresale(accounts[1], tokensAmount, bonusTokensAmount, 3, {from: accounts[0]})
+                } catch (error) {
+                    assert(true, `Expected throw, but got ${error} instead`);
+
+                    return;
+                }
+                assert(false, "Did not throw as expected");
+            });
+
             it('should add presale contribution', async function () {
                 var saleBalance = await token.balanceOf(sale.address)
                 var ledgerBalance = await token.balanceOf(ledger.address)
 
-                await sale.addPresale(accounts[1], tokensAmount, 1, {from: accounts[0]})
+                await sale.addPresale(accounts[1], tokensAmount, bonusTokensAmount, 1, {from: accounts[0]})
 
                 var currentSaleBalance = await token.balanceOf(sale.address)
                 var currentLedgerBalance = await token.balanceOf(ledger.address)
 
-                var isEqual = currentSaleBalance.equals(saleBalance.sub(tokensAmount.mul(DECIMALSFACTOR)))
+                var isEqual = currentSaleBalance.equals(saleBalance.sub(tokensAmount.add(bonusTokensAmount).mul(DECIMALSFACTOR)))
                 assert(isEqual)
 
-                var isEqual = currentLedgerBalance.equals(ledgerBalance.add(tokensAmount.mul(DECIMALSFACTOR)))
+                var isEqual = currentLedgerBalance.equals(ledgerBalance.add(tokensAmount.add(bonusTokensAmount).mul(DECIMALSFACTOR)))
                 assert(isEqual)
             });
 
@@ -237,47 +286,25 @@ contract('Crowdsale', function (accounts) {
                 var saleBalance = await token.balanceOf(sale.address)
                 var ledgerBalance = await token.balanceOf(ledger.address)
 
-                await sale.addPresale(accounts[1], tokensAmount, 2, {from: accounts[0]})
+                await sale.addPresale(accounts[1], tokensAmount, bonusTokensAmount, 2, {from: accounts[0]})
                 
                 var currentSaleBalance = await token.balanceOf(sale.address)
                 var currentLedgerBalance = await token.balanceOf(ledger.address)
 
-                var isEqual = currentSaleBalance.equals(saleBalance.sub(tokensAmount.mul(DECIMALSFACTOR)))
+                var isEqual = currentSaleBalance.equals(saleBalance.sub(tokensAmount.add(bonusTokensAmount).mul(DECIMALSFACTOR)))
                 assert(isEqual)
 
-                var isEqual = currentLedgerBalance.equals(ledgerBalance.add(tokensAmount.mul(DECIMALSFACTOR)))
+                var isEqual = currentLedgerBalance.equals(ledgerBalance.add(tokensAmount.add(bonusTokensAmount).mul(DECIMALSFACTOR)))
                 assert(isEqual)
-            });
-
-            it('should add partner contribution with invalid amount', async function () {
-                try {
-                    await sale.addPresale(accounts[1], 0, 2, {from: accounts[0]})
-                } catch (error) {
-                    assert(true, `Expected throw, but got ${error} instead`);
-
-                    return;
-                }
-                assert(false, "Did not throw as expected");
-            });
-
-            it('should add partner contribution with invalid phase', async function () {
-                try {
-                    await sale.addPresale(accounts[1], tokensAmount, 3, {from: accounts[0]})
-                } catch (error) {
-                    assert(true, `Expected throw, but got ${error} instead`);
-
-                    return;
-                }
-                assert(false, "Did not throw as expected");
             });
         });
 
         describe('Revoke Presales', () => {
 
             before(async () => {
-                token = await J8TToken.new({ from: accounts[0], gas: 3500000 })
+                token = await J8TToken.new({ from: accounts[0], gas: 4500000 })
                 var totalTokens = new BigNumber(TOKEN_SALE_SUPPLY)
-                ledger = await Ledger.new(token.address, { from: accounts[0], gas: 3500000 })
+                ledger = await Ledger.new(token.address, { from: accounts[0], gas: 4500000 })
                 sale  = await Crowdsale.new(
                     token.address,
                     ledger.address,
@@ -288,7 +315,6 @@ contract('Crowdsale', function (accounts) {
                 await sale.forceTokensPerEther(TOKENS_PER_ETHER);
                 await sale.setStartTimestamp(START_TIME);
                 await sale.setEndTimestamp(END_TIME);
-                await sale.setSaleSupply(totalTokens);
                 await sale.setMinContribution(CONTRIBUTION_MIN);
                 await sale.setMaxContribution(CONTRIBUTION_MAX);
                 await ledger.setOpsAddress(sale.address);
@@ -302,9 +328,9 @@ contract('Crowdsale', function (accounts) {
             // Partner = 2
 
             it('should add presales', async function () {
-                await sale.addPresale(accounts[1], tokensAmount, 1, {from: accounts[0]})
-                await sale.addPresale(accounts[1], tokensAmount, 2, {from: accounts[0]})
-                await sale.addPresale(accounts[2], tokensAmount, 2, {from: accounts[0]})
+                await sale.addPresale(accounts[1], tokensAmount, bonusTokensAmount, 1, {from: accounts[0]})
+                await sale.addPresale(accounts[1], tokensAmount, bonusTokensAmount, 2, {from: accounts[0]})
+                await sale.addPresale(accounts[2], tokensAmount, bonusTokensAmount, 2, {from: accounts[0]})
             });
 
             it('should revoke presale allocation', async function () {
@@ -314,11 +340,11 @@ contract('Crowdsale', function (accounts) {
                 await sale.revokePresale(accounts[1], 1, {from: accounts[0]})
                 
                 var currentSaleBalance = await token.balanceOf(sale.address)
-                var isEqual = currentSaleBalance.equals(saleBalance.add(tokensAmount.mul(DECIMALSFACTOR)))
+                var isEqual = currentSaleBalance.equals(saleBalance.add(tokensAmount.add(bonusTokensAmount).mul(DECIMALSFACTOR)))
                 assert(isEqual)
 
                 var currentLedgerBalance = await token.balanceOf(ledger.address)
-                isEqual = currentLedgerBalance.equals(ledgerBalance.sub(tokensAmount.mul(DECIMALSFACTOR)))
+                isEqual = currentLedgerBalance.equals(ledgerBalance.sub(tokensAmount.add(bonusTokensAmount).mul(DECIMALSFACTOR)))
                 assert(isEqual)  
             });
 
@@ -329,21 +355,21 @@ contract('Crowdsale', function (accounts) {
                 await sale.revokePresale(accounts[1], 2, {from: accounts[0]})
                 
                 var currentSaleBalance = await token.balanceOf(sale.address)
-                var isEqual = currentSaleBalance.equals(saleBalance.add(tokensAmount.mul(DECIMALSFACTOR)))
+                var isEqual = currentSaleBalance.equals(saleBalance.add(tokensAmount.add(bonusTokensAmount).mul(DECIMALSFACTOR)))
                 assert(isEqual)
 
                 var currentLedgerBalance = await token.balanceOf(ledger.address)
-                isEqual = currentLedgerBalance.equals(ledgerBalance.sub(tokensAmount.mul(DECIMALSFACTOR)))
+                isEqual = currentLedgerBalance.equals(ledgerBalance.sub(tokensAmount.add(bonusTokensAmount).mul(DECIMALSFACTOR)))
                 assert(isEqual)
 
                 await sale.revokePresale(accounts[2], 2, {from: accounts[0]})
 
                 currentSaleBalance = await token.balanceOf(sale.address)
-                isEqual = currentSaleBalance.equals(saleBalance.add(tokensAmount.mul(DECIMALSFACTOR).mul(2)))
+                isEqual = currentSaleBalance.equals(saleBalance.add(tokensAmount.add(bonusTokensAmount).mul(DECIMALSFACTOR).mul(2)))
                 assert(isEqual)
 
                 currentLedgerBalance = await token.balanceOf(ledger.address)
-                isEqual = currentLedgerBalance.equals(ledgerBalance.sub(tokensAmount.mul(DECIMALSFACTOR).mul(2)))
+                isEqual = currentLedgerBalance.equals(ledgerBalance.sub(tokensAmount.add(bonusTokensAmount).mul(DECIMALSFACTOR).mul(2)))
                 assert(isEqual)
             });
 

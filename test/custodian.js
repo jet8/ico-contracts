@@ -18,6 +18,7 @@ contract('Custodian', function (accounts) {
 			custodian = await Custodian.new(token.address, {from: accounts[0], gas: 3500000 })
 			await token.transfer(custodian.address, allocationAmount.mul(10).mul(DECIMALSFACTOR), { from: accounts[0] })
 			await custodian.setOpsAddress(accounts[0]);
+			await custodian.setAdminAddress(accounts[0]);
 			await custodian.setTeamSupply(allocationAmount.mul(4).mul(DECIMALSFACTOR), { from: accounts[0] })
 			await custodian.setAdvisorsSupply(allocationAmount.mul(5).mul(DECIMALSFACTOR), { from: accounts[0] })
 			await custodian.setBountySupply(allocationAmount.mul(1).mul(DECIMALSFACTOR), { from: accounts[0] })

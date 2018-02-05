@@ -39,9 +39,9 @@ contract('Crowdsale - Refund', function (accounts) {
     let initialWalletBalance;
 
     before(async () => {
-        token = await J8TToken.new({ from: accounts[0], gas: 3500000 })
+        token = await J8TToken.new({ from: accounts[0], gas: 4500000 })
         var totalTokens = new BigNumber(TOKEN_SALE_SUPPLY)
-        ledger = await Ledger.new(token.address, { from: accounts[0], gas: 3500000 })
+        ledger = await Ledger.new(token.address, { from: accounts[0], gas: 4500000 })
         sale  = await Crowdsale.new(
             token.address,
             ledger.address,
@@ -52,7 +52,6 @@ contract('Crowdsale - Refund', function (accounts) {
         await sale.setAdminAddress(accounts[0])
         await sale.setStartTimestamp(Moment().add('1', 'second').unix());
         await sale.setEndTimestamp(END_TIME);
-        await sale.setSaleSupply(totalTokens);
         await sale.setMinContribution(CONTRIBUTION_MIN);
         await sale.setMaxContribution(CONTRIBUTION_MAX);
         await ledger.setOpsAddress(sale.address);

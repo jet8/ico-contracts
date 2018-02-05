@@ -1,6 +1,9 @@
 pragma solidity ^0.4.17;
 import 'zeppelin-solidity/contracts/token/StandardToken.sol';
 import 'zeppelin-solidity/contracts/token/BurnableToken.sol';
+import 'zeppelin-solidity/contracts/ownership/Ownable.sol';
+
+import './J8TTokenConfig.sol';
 
 //////////////////////////////////////////////////////////////////////
 // @title J8T Token 									   			//
@@ -18,14 +21,22 @@ import 'zeppelin-solidity/contracts/token/BurnableToken.sol';
 // 														   			//
 //////////////////////////////////////////////////////////////////////
 
-contract J8TToken is BurnableToken {
+contract J8TToken is J8TTokenConfig, BurnableToken, Ownable {
 	string public constant name            = "J8T Token";
 	string public constant symbol          = "J8T";
-	uint256 public constant decimals       = 8;
+	uint256 public constant decimals       = TOKEN_DECIMALS;
 	uint256 public constant INITIAL_SUPPLY = 1500000000 * (10 ** uint256(decimals));
 
-	function J8TToken() {
+    event Transfer(address indexed _from, address indexed _to, uint256 _value);
+
+    function J8TToken() {
 	    totalSupply = INITIAL_SUPPLY;
 	    balances[msg.sender] = INITIAL_SUPPLY;
+
+        //https://github.com/ethereum/EIPs/blob/master/EIPS/eip-20.md#transfer-1
+        //EIP 20: A token contract which creates new tokens SHOULD trigger a
+        //Transfer event with the _from address set to 0x0
+        //when tokens are created.
+        Transfer(0x0, msg.sender, INITIAL_SUPPLY);
 	 }
 }

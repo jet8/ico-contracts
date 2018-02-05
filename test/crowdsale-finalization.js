@@ -14,7 +14,6 @@ contract('Crowdsale - Finalization', function (accounts) {
     }
 
     const DECIMALSFACTOR     = new BigNumber('10').pow('8')
-    const DECIMALSFACTOR_ETH = new BigNumber('10').pow('18')
 
     const END_TIME                  = Moment().add('1', 'days').unix();
     const MIN_ETH                   = 0.1
@@ -25,7 +24,6 @@ contract('Crowdsale - Finalization', function (accounts) {
     const dollar_per_token   = 0.01;
     const dollars_per_ether  = 400;
     const TOKENS_PER_ETHER   = new BigNumber(dollars_per_ether / dollar_per_token);
-    const TOKENS_PER_WEI     = new BigNumber(TOKENS_PER_ETHER.mul(DECIMALSFACTOR));
     const TOKEN_SALE_SUPPLY  = new BigNumber('1100000').mul(DECIMALSFACTOR);
     const contributorAddress = accounts[1]
     const wallet = accounts[9];
@@ -39,9 +37,9 @@ contract('Crowdsale - Finalization', function (accounts) {
     let initialWalletBalance;
 
     beforeEach(async () => {
-        token           = await J8TToken.new({ from: accounts[0], gas: 3500000 })
+        token           = await J8TToken.new({ from: accounts[0], gas: 4500000 })
         var totalTokens = new BigNumber(TOKEN_SALE_SUPPLY)
-        ledger          = await Ledger.new(token.address, { from: accounts[0], gas: 3500000 })
+        ledger          = await Ledger.new(token.address, { from: accounts[0], gas: 4500000 })
         sale            = await Crowdsale.new(
             token.address,
             ledger.address,
@@ -52,7 +50,6 @@ contract('Crowdsale - Finalization', function (accounts) {
         await sale.setAdminAddress(accounts[0])
         await sale.setStartTimestamp(Moment().add('1', 'second').unix());
         await sale.setEndTimestamp(END_TIME);
-        await sale.setSaleSupply(totalTokens);
         await sale.setMinContribution(CONTRIBUTION_MIN);
         await sale.setMaxContribution(CONTRIBUTION_MAX);
         await ledger.setOpsAddress(sale.address);
@@ -72,6 +69,7 @@ contract('Crowdsale - Finalization', function (accounts) {
         await sale.purchaseTokens({from: accounts[1], value: CONTRIBUTION_MAX})
         await sale.purchaseTokens({from: accounts[2], value: CONTRIBUTION_MAX})
         const {logs} = await sale.purchaseTokens({from: accounts[3], value: CONTRIBUTION_MAX})
+
         const event_finalized  = logs.find(e => e.event == "Finalized");
         assert.notEqual(event_finalized, undefined);
         const event_burned     = logs.find(e => e.event == "Burned");
@@ -93,9 +91,7 @@ contract('Crowdsale - Finalization', function (accounts) {
         await sale.purchaseTokens({from: accounts[1], value: CONTRIBUTION_MAX})
         await sale.purchaseTokens({from: accounts[2], value: CONTRIBUTION_MAX})
 
-        const sale_supply            = (await sale.saleSupply()).toNumber();
-        const tokens_sold            = (await sale.totalTokensSold()).toNumber()
-        const expected_burned_amount = sale_supply - tokens_sold;
+        const expected_burned_amount = (await token.balanceOf(sale.address)).toNumber()
         const token_supply           = (await token.totalSupply()).toNumber()
 
         //Finalize & Logs
@@ -107,8 +103,9 @@ contract('Crowdsale - Finalization', function (accounts) {
 
         //Amounts status
         const token_supply_after_burn = (await token.totalSupply()).toNumber()
-        const sale_supply_after_burn  = (await sale.saleSupply()).toNumber();
+        const sale_supply_after_burn  = (await token.balanceOf(sale.address)).toNumber()
         assert.equal(token_supply_after_burn, token_supply - expected_burned_amount);
-        assert.equal(sale_supply_after_burn, sale_supply - expected_burned_amount);
+        assert.equal(sale_supply_after_burn, 0);
+
     })
 });

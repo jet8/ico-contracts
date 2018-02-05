@@ -8,22 +8,27 @@ var Crowdsale = artifacts.require('Crowdsale');
 
 
 contract('Ledger', function (accounts) {
+	
+	const DECIMALSFACTOR = new BigNumber('10').pow('8')
+	var allocationAmount = new BigNumber(40000).mul(DECIMALSFACTOR);
+	var bonusAllocationAmount = new BigNumber(15000).mul(DECIMALSFACTOR);
+	
+	let token;
+	let ledger;
+	let sale;
+
 	describe('Add Allocations', () => {
 
-		const DECIMALSFACTOR = new BigNumber('10').pow('8')
-		var allocationAmount = new BigNumber(40000).mul(DECIMALSFACTOR);
-		let token;
-		let ledger;
-
 		before('should initialize token and ledger smart contracts', async function () {
-			token = await J8TToken.new({ from: accounts[0], gas: 3500000 });
-			ledger = await Ledger.new(token.address, {from: accounts[0], gas: 3500000 })
+			token = await J8TToken.new({ from: accounts[0], gas: 4500000 });
+			ledger = await Ledger.new(token.address, {from: accounts[0], gas: 4500000 })
 			await ledger.setOpsAddress(accounts[0]);
+			await token.transfer(ledger.address, 2 * allocationAmount, { from: accounts[0] })
 		});
 
 	 	it('should not add an allocation with an amount equal to zero', async function () {
 	 		try {
-	 			await ledger.addAllocation(accounts[1], 0, 0, {from: accounts[0], gas: 3500000 })
+	 			await ledger.addAllocation(accounts[1], 0, 0, 0, {from: accounts[0], gas: 3500000 })
 	 		} catch (error) {
 	 			assert(true, `Expected throw, but got ${error} instead`)
 	 			return
@@ -32,19 +37,19 @@ contract('Ledger', function (accounts) {
         });
 
         it('should add an allocation', async function () {
-        	await ledger.addAllocation(accounts[1], allocationAmount, 0, {from: accounts[0], gas: 3500000 })
+        	await ledger.addAllocation(accounts[1], allocationAmount, 0, 0, {from: accounts[0], gas: 3500000 })
         });
 
     	it('should add a new allocation for a contributor that already has an allocation', async function () {
-    		await ledger.addAllocation(accounts[1], allocationAmount, 0, {from: accounts[0], gas: 3500000 })
-    		var balance = await ledger.currentSupply()
+    		await ledger.addAllocation(accounts[1], allocationAmount, 0, 0, {from: accounts[0], gas: 3500000 })
+    		var balance = await token.balanceOf(ledger.address)
     		var totalAllocated = allocationAmount.mul(2)
     		var isEqual = balance.equals(totalAllocated)
     		assert(isEqual)
     	});
 
     	it('should have granted tokens equal to the ledger current supply', async function () {
-    		var totalAmountGranted = await ledger.currentSupply()
+    		var totalAmountGranted = await token.balanceOf(ledger.address)
     		var totalAllocated = allocationAmount.mul(2)
     		var isEqual = totalAmountGranted.equals(totalAllocated)
     		assert(isEqual)
@@ -53,16 +58,10 @@ contract('Ledger', function (accounts) {
 
     describe('Revoke Allocations', () => {
 
-		const DECIMALSFACTOR = new BigNumber('10').pow('8')
-		var allocationAmount = new BigNumber(40000).mul(DECIMALSFACTOR);
-		let token;
-		let ledger;
-		let sale;
-
 		before('should initialize token and ledger smart contracts', async function () {
-			token = await J8TToken.new({ from: accounts[0], gas: 3500000 });
-			ledger = await Ledger.new(token.address, {from: accounts[0], gas: 3500000 })
-			await token.transfer(ledger.address, 4 * allocationAmount, { from: accounts[0] })
+			token = await J8TToken.new({ from: accounts[0], gas: 4500000 });
+			ledger = await Ledger.new(token.address, {from: accounts[0], gas: 4500000 })
+			await token.transfer(ledger.address, 4 * allocationAmount + bonusAllocationAmount * 3, { from: accounts[0] })
 			sale  = await Crowdsale.new(
                     token.address,
                     ledger.address,
@@ -74,18 +73,18 @@ contract('Ledger', function (accounts) {
 		});
 
         it('should add allocations', async function () {
-        	await ledger.addAllocation(accounts[1], allocationAmount, 0, {from: accounts[0], gas: 3500000 })
-        	await ledger.addAllocation(accounts[1], allocationAmount, 1, {from: accounts[0], gas: 3500000 })
-        	await ledger.addAllocation(accounts[1], allocationAmount, 1, {from: accounts[0], gas: 3500000 })
-        	await ledger.addAllocation(accounts[1], allocationAmount, 2, {from: accounts[0], gas: 3500000 })
+        	await ledger.addAllocation(accounts[1], allocationAmount, 0, 0, {from: accounts[0], gas: 3500000 })
+        	await ledger.addAllocation(accounts[1], allocationAmount, bonusAllocationAmount, 1, {from: accounts[0], gas: 3500000 })
+        	await ledger.addAllocation(accounts[1], allocationAmount, bonusAllocationAmount, 1, {from: accounts[0], gas: 3500000 })
+        	await ledger.addAllocation(accounts[1], allocationAmount, bonusAllocationAmount, 2, {from: accounts[0], gas: 3500000 })
         });
 
     	it('should revoke public allocation', async function () {
-    		var ledgerSupply = await ledger.currentSupply()
+    		var ledgerSupply = await token.balanceOf(ledger.address)
 
     		await ledger.revokeAllocation(accounts[1], 0, {from: accounts[0], gas: 3500000 })
 
-    		var currentLedgerSupply = await ledger.currentSupply()
+    		var currentLedgerSupply = await token.balanceOf(ledger.address)
     		var isEqual = currentLedgerSupply.equals(ledgerSupply.sub(allocationAmount))
     		assert(isEqual)
 
@@ -99,30 +98,31 @@ contract('Ledger', function (accounts) {
     	});
 
     	it('should revoke presale allocation', async function () {
-    		var ledgerSupply = await ledger.currentSupply()
+    		var ledgerSupply = await token.balanceOf(ledger.address)
+    		var privateSupply = await ledger.totalPrivateAllocation()
 
     		await ledger.revokeAllocation(accounts[1], 1, {from: accounts[0], gas: 3500000 })
 
-    		var currentLedgerSupply = await ledger.currentSupply()
-    		var isEqual = currentLedgerSupply.equals(ledgerSupply.sub(allocationAmount.mul(2)))
+    		var currentLedgerSupply = await token.balanceOf(ledger.address)
+    		var isEqual = currentLedgerSupply.equals(ledgerSupply.sub(allocationAmount.mul(2).add(bonusAllocationAmount.mul(2))))
     		assert(isEqual)
 
-    		var privateSupply = await ledger.totalPrivateAllocation()
-    		isEqual = privateSupply.equals(allocationAmount)
+    		var currentPrivateSupply = await ledger.totalPrivateAllocation()
+    		isEqual = currentPrivateSupply.equals(privateSupply.sub(allocationAmount.mul(2).add(bonusAllocationAmount.mul(2))))
     		assert(isEqual)
 
     		var saleBalance = await token.balanceOf(sale.address)
-    		isEqual = saleBalance.equals(allocationAmount.mul(3))
+    		isEqual = saleBalance.equals(allocationAmount.mul(3).add(bonusAllocationAmount.mul(2)))
     		assert(isEqual)
     	});
 
     	it('should revoke partner allocation', async function () {
-    		var ledgerSupply = await ledger.currentSupply()
+    		var ledgerSupply = await token.balanceOf(ledger.address)
 
     		await ledger.revokeAllocation(accounts[1], 2, {from: accounts[0], gas: 3500000 })
 
-    		var currentLedgerSupply = await ledger.currentSupply()
-    		var isEqual = currentLedgerSupply.equals(ledgerSupply.sub(allocationAmount))
+    		var currentLedgerSupply = await token.balanceOf(ledger.address)
+    		var isEqual = currentLedgerSupply.equals(ledgerSupply.sub(allocationAmount.add(bonusAllocationAmount)))
     		assert(isEqual)
 
     		var privateSupply = await ledger.totalPrivateAllocation()
@@ -130,29 +130,27 @@ contract('Ledger', function (accounts) {
     		assert(isEqual)
 
     		var saleBalance = await token.balanceOf(sale.address)
-    		isEqual = saleBalance.equals(allocationAmount.mul(4))
+    		isEqual = saleBalance.equals(allocationAmount.mul(4).add(bonusAllocationAmount.mul(3)))
     		assert(isEqual)
     	});
     });
 
     describe('Claim Allocation', () => {
-    	var allocationAmount = new BigNumber(40000);
-		let token;
-		let ledger;
 
 		before('should initialize token and ledger smart contracts', async function () {
-			token = await J8TToken.new({ from: accounts[0], gas: 3500000 });
-			ledger = await Ledger.new(token.address, {from: accounts[0], gas: 3500000 })
+			token = await J8TToken.new({ from: accounts[0], gas: 4500000 });
+			ledger = await Ledger.new(token.address, {from: accounts[0], gas: 4500000 })
 			await ledger.setOpsAddress(accounts[0]);
-			await token.transfer(ledger.address, 10 * allocationAmount, { from: accounts[0] })
+			await ledger.setAdminAddress(accounts[0]);
+			await token.transfer(ledger.address, 2 * allocationAmount, { from: accounts[0] })
 		});
 
 		it('should let add allocations', async function () {
-        	await ledger.addAllocation(accounts[1], allocationAmount, 0, {from: accounts[0], gas: 3500000 })
-        	await ledger.addAllocation(accounts[2], allocationAmount, 0, {from: accounts[0], gas: 3500000 })
+        	await ledger.addAllocation(accounts[1], allocationAmount, 0, 0, {from: accounts[0], gas: 3500000 })
+        	await ledger.addAllocation(accounts[2], allocationAmount, 0, 0, {from: accounts[0], gas: 3500000 })
         });
 
-        it('should allow ops update claim status', async function() {
+        it('should allow admin update claim status', async function() {
 			await ledger.setCanClaimTokens(true, { from: accounts[0] });
 		});
 
@@ -167,9 +165,9 @@ contract('Ledger', function (accounts) {
 		});
 
 		it('should allow valid contributor claim tokens', async function () {
-			var ledgerSupply = new BigNumber(await ledger.currentSupply())
+			var ledgerSupply = new BigNumber(await token.balanceOf(ledger.address))
 			await ledger.claimTokens({from: accounts[1], gas: 3500000 })
-			var remainingSupply = new BigNumber(await ledger.currentSupply())
+			var remainingSupply = new BigNumber(await token.balanceOf(ledger.address))
 			var tokens = remainingSupply.add(allocationAmount)
 			assert(ledgerSupply, tokens)
 		});
@@ -187,40 +185,37 @@ contract('Ledger', function (accounts) {
 
     describe('Claim Allocations', () => {
 
-    	var allocationAmount = new BigNumber(40000);
-		let token;
-		let ledger;
-
 		before('should initialize token and ledger smart contracts', async function () {
-			token = await J8TToken.new({ from: accounts[0], gas: 3500000 });
-			ledger = await Ledger.new(token.address, {from: accounts[0], gas: 3500000 })
+			token = await J8TToken.new({ from: accounts[0], gas: 4500000 });
+			ledger = await Ledger.new(token.address, {from: accounts[0], gas: 4500000 })
 			await ledger.setOpsAddress(accounts[0]);
-			await token.transfer(ledger.address, 10 * allocationAmount, { from: accounts[0] })
+			await ledger.setAdminAddress(accounts[0]);
+			await token.transfer(ledger.address, 10 * allocationAmount + 6 * bonusAllocationAmount, { from: accounts[0] })
 		});
 
 		it('should set correct supply values', async function() {
-			await ledger.addAllocation(accounts[1], allocationAmount, 2, {from: accounts[0], gas: 3500000 })
-        	await ledger.addAllocation(accounts[1], allocationAmount, 2, {from: accounts[0], gas: 3500000 })
-        	await ledger.addAllocation(accounts[1], allocationAmount, 2, {from: accounts[0], gas: 3500000 })
-        	await ledger.addAllocation(accounts[1], allocationAmount, 2, {from: accounts[0], gas: 3500000 })
-        	await ledger.addAllocation(accounts[1], allocationAmount, 2, {from: accounts[0], gas: 3500000 })
-        	await ledger.addAllocation(accounts[2], allocationAmount, 2, {from: accounts[0], gas: 3500000 })
-        	await ledger.addAllocation(accounts[3], allocationAmount, 0, {from: accounts[0], gas: 3500000 })
-        	await ledger.addAllocation(accounts[4], allocationAmount, 0, {from: accounts[0], gas: 3500000 })
-        	await ledger.addAllocation(accounts[5], allocationAmount, 0, {from: accounts[0], gas: 3500000 })
-        	await ledger.addAllocation(accounts[6], allocationAmount, 0, {from: accounts[0], gas: 3500000 })
+			await ledger.addAllocation(accounts[1], allocationAmount, bonusAllocationAmount, 2, {from: accounts[0], gas: 3500000 })
+        	await ledger.addAllocation(accounts[1], allocationAmount, bonusAllocationAmount, 2, {from: accounts[0], gas: 3500000 })
+        	await ledger.addAllocation(accounts[1], allocationAmount, bonusAllocationAmount, 2, {from: accounts[0], gas: 3500000 })
+        	await ledger.addAllocation(accounts[1], allocationAmount, bonusAllocationAmount, 2, {from: accounts[0], gas: 3500000 })
+        	await ledger.addAllocation(accounts[1], allocationAmount, bonusAllocationAmount, 2, {from: accounts[0], gas: 3500000 })
+        	await ledger.addAllocation(accounts[2], allocationAmount, bonusAllocationAmount, 2, {from: accounts[0], gas: 3500000 })
+        	await ledger.addAllocation(accounts[3], allocationAmount, 0, 0, {from: accounts[0], gas: 3500000 })
+        	await ledger.addAllocation(accounts[4], allocationAmount, 0, 0, {from: accounts[0], gas: 3500000 })
+        	await ledger.addAllocation(accounts[5], allocationAmount, 0, 0, {from: accounts[0], gas: 3500000 })
+        	await ledger.addAllocation(accounts[6], allocationAmount, 0, 0, {from: accounts[0], gas: 3500000 })
 
-        	var currentSupply = new BigNumber(await ledger.currentSupply())
+        	var currentSupply = new BigNumber(await token.balanceOf(ledger.address))
         	var privateAllocations = new BigNumber(await ledger.totalPrivateAllocation())
         	var publicAllocations = new BigNumber(await ledger.totalPublicAllocation())
 
-        	var amount = allocationAmount.mul(6)
+        	var amount = allocationAmount.mul(6).add(bonusAllocationAmount.mul(6))
         	var isEqual = privateAllocations.equals(amount)
         	assert(isEqual)
         	amount = allocationAmount.mul(4)
         	isEqual = publicAllocations.equals(amount)
         	assert(isEqual)
-        	amount = allocationAmount.mul(10)
+        	amount = allocationAmount.mul(10).add(bonusAllocationAmount.mul(6))
         	isEqual = currentSupply.equals(amount)
         	assert(isEqual)
 		});
@@ -294,14 +289,14 @@ contract('Ledger', function (accounts) {
 			await ledger.claimTokens({from: accounts[2], gas: 3500000 })
 		});
 
-		it('should send allocations to all contributors', async function () {
-			var remainingSupply = new BigNumber(await ledger.currentSupply())
-			var empty = new BigNumber('0')
-			var isEqual = remainingSupply.equals(empty)
+		it('should send allocations to all private contributors', async function () {
+			var remainingSupply = new BigNumber(await token.balanceOf(ledger.address))
+			var bonuses = bonusAllocationAmount.mul(6)
+			var isEqual = remainingSupply.equals(bonuses)
 			assert(isEqual)
 		});
 
-		it('should transfer the correct amount of J8T to public contributors', async function () {
+		it('should transfer the correct amount of J8T to private contributors', async function () {
 			// contributor 3
 			var balance = await token.balanceOf(accounts[1])
 			var amount = allocationAmount.mul(5)
@@ -314,30 +309,69 @@ contract('Ledger', function (accounts) {
 			isEqual = balance.equals(amount)
 			assert(isEqual)
 		});
+
+		it('should not allow presale contributors claim bonus tokens', async function () {
+
+    		try {
+				await ledger.claimTokens({from: accounts[1], gas: 3500000 })
+	 		} catch (error) {
+	 			assert(true, `Expected throw, but got ${error} instead`)
+	 			return
+	 		}
+	 		assert(false, "Did not throw as expected");
+		});
+
+		it('should allow ops update bonus claim status', async function() {
+			await ledger.setCanClaimBonusTokens(true, { from: accounts[0] });
+		});
+
+		it('should allow private contributors claim bonus tokens', async function () {
+			await ledger.claimTokens({from: accounts[1], gas: 3500000 })
+			await ledger.claimTokens({from: accounts[2], gas: 3500000 })
+		});
+
+		it('should send bonus allocations to all private contributors', async function () {
+			var remainingSupply = new BigNumber(await token.balanceOf(ledger.address))
+			var empty = new BigNumber('0')
+			var isEqual = remainingSupply.equals(empty)
+			assert(isEqual)
+		});
+
+		it('should transfer the correct amount of J8T bous to private contributors', async function () {
+			// contributor 3
+			var balance = await token.balanceOf(accounts[1])
+			var amount = allocationAmount.mul(5).add(bonusAllocationAmount.mul(5))
+			var isEqual = balance.equals(amount)
+			assert(isEqual)
+
+			// contributor 4
+			balance = await token.balanceOf(accounts[2])
+			amount = allocationAmount.add(bonusAllocationAmount)
+			isEqual = balance.equals(amount)
+			assert(isEqual)
+		});
     });
 
     describe('Claim Allocation - Partner Contributor Flow', () => {
-    	var allocationAmount = new BigNumber(40000);
-		let token;
-		let ledger;
 
 		before('should initialize token and ledger smart contracts', async function () {
-			token = await J8TToken.new({ from: accounts[0], gas: 3500000 });
-			ledger = await Ledger.new(token.address, {from: accounts[0], gas: 3500000 })
+			token = await J8TToken.new({ from: accounts[0], gas: 4500000 });
+			ledger = await Ledger.new(token.address, {from: accounts[0], gas: 4500000 })
 			await ledger.setOpsAddress(accounts[0]);
-			await token.transfer(ledger.address, 8 * allocationAmount, { from: accounts[0] })
+			await ledger.setAdminAddress(accounts[0]);
+			await token.transfer(ledger.address, 8 * allocationAmount + bonusAllocationAmount * 2, { from: accounts[0] })
 		});
 
 		it('should add allocations', async function () {
-			await ledger.addAllocation(accounts[1], allocationAmount.mul(5), 2, {from: accounts[0], gas: 3500000 })
-			await ledger.addAllocation(accounts[1], allocationAmount.mul(2), 1, {from: accounts[0], gas: 3500000 })
-			await ledger.addAllocation(accounts[1], allocationAmount, 0, {from: accounts[0], gas: 3500000 })
+			await ledger.addAllocation(accounts[1], allocationAmount.mul(5), bonusAllocationAmount, 2, {from: accounts[0], gas: 3500000 })
+			await ledger.addAllocation(accounts[1], allocationAmount.mul(2), bonusAllocationAmount, 1, {from: accounts[0], gas: 3500000 })
+			await ledger.addAllocation(accounts[1], allocationAmount, 0, 0, {from: accounts[0], gas: 3500000 })
 
-			var currentSupply = new BigNumber(await ledger.currentSupply())
+			var currentSupply = new BigNumber(await token.balanceOf(ledger.address))
         	var privateAllocations = new BigNumber(await ledger.totalPrivateAllocation())
         	var publicAllocations = new BigNumber(await ledger.totalPublicAllocation())
 
-        	var amount = allocationAmount.mul(7)
+        	var amount = allocationAmount.mul(7).add(bonusAllocationAmount.mul(2))
         	var isEqual = privateAllocations.equals(amount)
         	assert(isEqual)
 
@@ -345,12 +379,12 @@ contract('Ledger', function (accounts) {
         	isEqual = publicAllocations.equals(amount)
         	assert(isEqual)
 
-        	amount = allocationAmount.mul(8)
+        	amount = allocationAmount.mul(8).add(bonusAllocationAmount.mul(2))
         	isEqual = currentSupply.equals(amount)
         	assert(isEqual)
 		});
 
-		it('should claim and get only public allocation', async function () {
+		it('should set claim and get only public allocation', async function () {
 			await ledger.setCanClaimTokens(true, { from: accounts[0] });
 			await ledger.claimTokens({from: accounts[1], gas: 3500000})
 			var balance = await token.balanceOf(accounts[1])
@@ -358,7 +392,7 @@ contract('Ledger', function (accounts) {
 			assert(isEqual)
 		});
 
-		it('should claim and get only presale allocation', async function () {
+		it('should set claim and get only presale allocation', async function () {
 			await ledger.setCanClaimPresaleTokens(true, { from: accounts[0] });
 			await ledger.claimTokens({from: accounts[1], gas: 3500000})
 			var balance = await token.balanceOf(accounts[1])
@@ -366,37 +400,43 @@ contract('Ledger', function (accounts) {
 			assert(isEqual)
 		});
 
-		it('should claim and get only partner allocation', async function () {
+		it('should set claim and get only partner allocation', async function () {
 			await ledger.setCanClaimPartnerTokens(true, { from: accounts[0] });
 			await ledger.claimTokens({from: accounts[1], gas: 3500000})
 			var balance = await token.balanceOf(accounts[1])
 			var isEqual = balance.equals(allocationAmount.mul(8))
 			assert(isEqual)
 		});
+
+		it('should set claim and get bonus allocation', async function () {
+			await ledger.setCanClaimBonusTokens(true, { from: accounts[0] });
+			await ledger.claimTokens({from: accounts[1], gas: 3500000})
+			var balance = await token.balanceOf(accounts[1])
+			var isEqual = balance.equals(allocationAmount.mul(8).add(bonusAllocationAmount.mul(2)))
+			assert(isEqual)
+		});
     });
 
     describe('Claim Allocation - Partner Contributor Flow (all at one time)', () => {
-    	var allocationAmount = new BigNumber(40000);
-		let token;
-		let ledger;
 
 		before('should initialize token and ledger smart contracts', async function () {
-			token = await J8TToken.new({ from: accounts[0], gas: 3500000 });
-			ledger = await Ledger.new(token.address, {from: accounts[0], gas: 3500000 })
+			token = await J8TToken.new({ from: accounts[0], gas: 4500000 });
+			ledger = await Ledger.new(token.address, {from: accounts[0], gas: 4500000 })
 			await ledger.setOpsAddress(accounts[0]);
-			await token.transfer(ledger.address, 8 * allocationAmount, { from: accounts[0] })
+			await ledger.setAdminAddress(accounts[0]);
+			await token.transfer(ledger.address, 8 * allocationAmount + bonusAllocationAmount * 2, { from: accounts[0] })
 		});
 
 		it('should add allocations', async function () {
-			await ledger.addAllocation(accounts[1], allocationAmount.mul(5), 2, {from: accounts[0], gas: 3500000 })
-			await ledger.addAllocation(accounts[1], allocationAmount.mul(2), 1, {from: accounts[0], gas: 3500000 })
-			await ledger.addAllocation(accounts[1], allocationAmount, 0, {from: accounts[0], gas: 3500000 })
+			await ledger.addAllocation(accounts[1], allocationAmount.mul(5), bonusAllocationAmount, 2, {from: accounts[0], gas: 3500000 })
+			await ledger.addAllocation(accounts[1], allocationAmount.mul(2), bonusAllocationAmount, 1, {from: accounts[0], gas: 3500000 })
+			await ledger.addAllocation(accounts[1], allocationAmount, 0, 0, {from: accounts[0], gas: 3500000 })
 
-			var currentSupply = new BigNumber(await ledger.currentSupply())
+			var currentSupply = new BigNumber(await token.balanceOf(ledger.address))
         	var privateAllocations = new BigNumber(await ledger.totalPrivateAllocation())
         	var publicAllocations = new BigNumber(await ledger.totalPublicAllocation())
 
-        	var amount = allocationAmount.mul(7)
+        	var amount = allocationAmount.mul(7).add(bonusAllocationAmount.mul(2))
         	var isEqual = privateAllocations.equals(amount)
         	assert(isEqual)
 
@@ -404,7 +444,7 @@ contract('Ledger', function (accounts) {
         	isEqual = publicAllocations.equals(amount)
         	assert(isEqual)
 
-        	amount = allocationAmount.mul(8)
+        	amount = allocationAmount.mul(8).add(bonusAllocationAmount.mul(2))
         	isEqual = currentSupply.equals(amount)
         	assert(isEqual)
 		});
@@ -413,10 +453,11 @@ contract('Ledger', function (accounts) {
 			await ledger.setCanClaimTokens(true, { from: accounts[0] });
 			await ledger.setCanClaimPresaleTokens(true, { from: accounts[0] });
 			await ledger.setCanClaimPartnerTokens(true, { from: accounts[0] });
-			
+			await ledger.setCanClaimBonusTokens(true, { from: accounts[0] });
+
 			await ledger.claimTokens({from: accounts[1], gas: 3500000})
 			var balance = await token.balanceOf(accounts[1])
-			var isEqual = balance.equals(allocationAmount.mul(8))
+			var isEqual = balance.equals(allocationAmount.mul(8).add(bonusAllocationAmount.mul(2)))
 			assert(isEqual)
 		});
     });

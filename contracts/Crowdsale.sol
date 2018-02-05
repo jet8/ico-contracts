@@ -28,9 +28,6 @@ contract Crowdsale is ACLManaged, CrowdsaleConfig {
     // Ratio of J8T tokens to per ether
     uint256 public tokensPerEther;
 
-    // The total amount of tokens to be sold
-    uint256 public saleSupply;
-
     // The total amount of wei raised in the token sale
     // Including presales (in eth) and public sale
     uint256 public weiRaised;
@@ -39,8 +36,8 @@ contract Crowdsale is ACLManaged, CrowdsaleConfig {
     uint256 public totalTokensSold;
 
     // The minimum and maximum eth contribution accepted in the token sale
-    uint256 public MIN_CONTRIBUTION;
-    uint256 public MAX_CONTRIBUTION;
+    uint256 public minContribution;
+    uint256 public maxContribution;
 
     // The wallet address where the token sale sends all eth contributions
     address public wallet;
@@ -54,6 +51,9 @@ contract Crowdsale is ACLManaged, CrowdsaleConfig {
     //  PreSaleContributor: Can contribute on both pre-sale and pubic sale phases (uint8  - 1)
     //  PublicSaleContributor: Can contribute on he public sale phase (uint8  - 2)
     mapping(address => WhitelistPermission) public whitelist;
+
+    // Map of addresses that has already contributed on the token sale
+    mapping(address => bool) public hasContributed;
 
     enum WhitelistPermission {
         CannotContribute, PreSaleContributor, PublicSaleContributor 
@@ -88,13 +88,10 @@ contract Crowdsale is ACLManaged, CrowdsaleConfig {
     // Triggered when the wallet property has been updated
     event WalletUpdated(address _who, address _oldWallet, address _newWallet);
 
-    // Triggered when the saleSupply property has been updated
-    event SaleSupplyUpdated(address _who, uint256 _oldValue, uint256 _newValue);
-
-    // Triggered when the MIN_CONTRIBUTION property has been updated
+    // Triggered when the minContribution property has been updated
     event MinContributionUpdated(address _who, uint256 _oldValue, uint256 _newValue);
 
-    // Triggered when the MAX_CONTRIBUTION property has been updated
+    // Triggered when the maxContribution property has been updated
     event MaxContributionUpdated(address _who, uint256 _oldValue, uint256 _newValue);
 
     // Triggered when the token sale has finalized
@@ -136,9 +133,8 @@ contract Crowdsale is ACLManaged, CrowdsaleConfig {
         startTimestamp   = _start;
         endTimestamp     = _end;
         tokensPerEther   = _tokensPerEther;
-        saleSupply       = _supply;
-        MIN_CONTRIBUTION = _min_contribution;
-        MAX_CONTRIBUTION = _max_contribution;
+        minContribution = _min_contribution;
+        maxContribution = _max_contribution;
         wallet           = _wallet;
         totalTokensSold  = 0;
         weiRaised        = 0;
@@ -159,6 +155,7 @@ contract Crowdsale is ACLManaged, CrowdsaleConfig {
 
     // Updates the startTimestamp propety with the new _start value
     function setStartTimestamp(uint256 _start) external onlyAdmin returns (bool) {
+        require(_start < endTimestamp);
         require(_start > currentTime());
 
         uint256 _oldValue = startTimestamp;
@@ -193,32 +190,26 @@ contract Crowdsale is ACLManaged, CrowdsaleConfig {
         return true;
     }
 
-    // Updates the saleSupply propety with the new _newSaleSupply value
-    function setSaleSupply(uint256 _newSaleSupply) external onlyAdmin returns (bool) {
-        uint256 _oldValue = saleSupply;
-        saleSupply = _newSaleSupply;
-       
-        SaleSupplyUpdated(msg.sender, _oldValue, saleSupply);
-        
-        return true;
-    }
-
-    // Updates the MIN_CONTRIBUTION propety with the new _newMinControbution value
+    // Updates the minContribution propety with the new _newMinControbution value
     function setMinContribution(uint256 _newMinContribution) external onlyAdmin returns (bool) {
-        uint256 _oldValue = MIN_CONTRIBUTION;
-        MIN_CONTRIBUTION = _newMinContribution;
+        require(_newMinContribution <= maxContribution);
+
+        uint256 _oldValue = minContribution;
+        minContribution = _newMinContribution;
         
-        MinContributionUpdated(msg.sender, _oldValue, MIN_CONTRIBUTION);
+        MinContributionUpdated(msg.sender, _oldValue, minContribution);
         
         return true;
     }
 
-    // Updates the MAX_CONTRIBUTION propety with the new _newMaxContribution value
+    // Updates the maxContribution propety with the new _newMaxContribution value
     function setMaxContribution(uint256 _newMaxContribution) external onlyAdmin returns (bool) {
-        uint256 _oldValue = MAX_CONTRIBUTION;
-        MAX_CONTRIBUTION = _newMaxContribution;
+        require(_newMaxContribution > minContribution);
+
+        uint256 _oldValue = maxContribution;
+        maxContribution = _newMaxContribution;
         
-        MaxContributionUpdated(msg.sender, _oldValue, MAX_CONTRIBUTION);
+        MaxContributionUpdated(msg.sender, _oldValue, maxContribution);
         
         return true;
     }
@@ -245,44 +236,53 @@ contract Crowdsale is ACLManaged, CrowdsaleConfig {
 
     // Adds a new presale allocation for the contributor with address _contributor
     // We can only allocate presale before the token sale has been initialized
-    function addPresale(address _contributor, uint256 _tokens, uint8 _contributorPhase) external payable onlyAdmin onlyBeforeSale returns (bool) {
+    function addPresale(address _contributor, uint256 _tokens, uint256 _bonus, uint8 _contributorPhase) external payable onlyAdminAndOps onlyBeforeSale returns (bool) {
         require(_tokens > 0);
+        require(_bonus > 0);
 
         // Converts the amount of tokens to our smallest J8T value, lucky
         uint256 luckys = _tokens.mul(J8T_DECIMALS_FACTOR);
-        uint256 availableTokensToPurchase = saleSupply.sub(totalTokensSold);
-        require(luckys <= availableTokensToPurchase);
+        uint256 bonusLuckys = _bonus.mul(J8T_DECIMALS_FACTOR);
+        uint256 totalTokens = luckys.add(bonusLuckys);
+
+        uint256 availableTokensToPurchase = tokenContract.balanceOf(address(this));
+        
+        require(totalTokens <= availableTokensToPurchase);
 
         // Insert the new allocation to the Ledger
-        require(ledgerContract.addAllocation(_contributor, luckys, _contributorPhase));
+        require(ledgerContract.addAllocation(_contributor, luckys, bonusLuckys, _contributorPhase));
         // Transfers the tokens form the Crowdsale contract to the Ledger contract
-        require(tokenContract.transfer(address(ledgerContract), luckys));
+        require(tokenContract.transfer(address(ledgerContract), totalTokens));
 
         // Updates totalTokensSold property
-        totalTokensSold = totalTokensSold.add(luckys);
+        totalTokensSold = totalTokensSold.add(totalTokens);
 
         // If we reach the total amount of tokens to sell we finilize the token sale
-        if (totalTokensSold == saleSupply) {
+        availableTokensToPurchase = tokenContract.balanceOf(address(this));
+        if (availableTokensToPurchase == 0) {
             finalization();
         }
 
         // Trigger PresaleAdded event
-        PresaleAdded(_contributor, luckys, _contributorPhase);
+        PresaleAdded(_contributor, totalTokens, _contributorPhase);
     }
 
     // The purchaseTokens function handles the token purchase flow
     function purchaseTokens() public payable onlyDuringSale returns (bool) {
-        address contributor  = msg.sender;
-        uint256 weiAmount    = msg.value;
+        address contributor = msg.sender;
+        uint256 weiAmount = msg.value;
 
+        // A contributor can only contribute once on the public sale
+        require(hasContributed[contributor] == false);
         // The contributor address must be whitelisted in order to be able to purchase tokens
         require(contributorCanContribute(contributor));
-        // The weiAmount must be greater or equal than MIN_CONTRIBUTION
-        require(weiAmount >= MIN_CONTRIBUTION);
-        // The weiAmount cannot be greater than MAX_CONTRIBUTION
-        require(weiAmount <= MAX_CONTRIBUTION);
-        // The saleSupply must be greater than totalTokensSold
-        require(totalTokensSold < saleSupply);
+        // The weiAmount must be greater or equal than minContribution
+        require(weiAmount >= minContribution);
+        // The weiAmount cannot be greater than maxContribution
+        require(weiAmount <= maxContribution);
+        // The availableTokensToPurchase must be greater than 0
+        uint256 availableTokensToPurchase = tokenContract.balanceOf(address(this));
+        require(availableTokensToPurchase > 0);
 
         // We need to convert the tokensPerEther to luckys (10**8)
         uint256 luckyPerEther = tokensPerEther.mul(J8T_DECIMALS_FACTOR);
@@ -295,7 +295,6 @@ contract Crowdsale is ACLManaged, CrowdsaleConfig {
 
         uint256 refund = 0;
         uint256 tokensToPurchase = tokensAmount;
-        uint256 availableTokensToPurchase = saleSupply.sub(totalTokensSold);
         
         // If the token purchase amount is bigger than the remaining token allocation
         // we can only sell the remainging tokens and refund the unused amount of eth
@@ -312,7 +311,8 @@ contract Crowdsale is ACLManaged, CrowdsaleConfig {
 
         // Insert the new allocation to the Ledger
         // we set the contribution phase as public (uint8 0)
-        require(ledgerContract.addAllocation(contributor, tokensToPurchase, 0));
+        // we set the bonus to 0
+        require(ledgerContract.addAllocation(contributor, tokensToPurchase, 0, 0));
         // Transfers the tokens form the Crowdsale contract to the Ledger contract
         require(tokenContract.transfer(address(ledgerContract), tokensToPurchase));
 
@@ -324,10 +324,14 @@ contract Crowdsale is ACLManaged, CrowdsaleConfig {
         // Transfer ether contribution to the wallet
         wallet.transfer(weiAmount);
 
+        // Update hasContributed mapping
+        hasContributed[contributor] = true;
+
         TokensPurchased(contributor, tokensToPurchase);
 
         // If we reach the total amount of tokens to sell we finilize the token sale
-        if (totalTokensSold == saleSupply) {
+        availableTokensToPurchase = tokenContract.balanceOf(address(this));
+        if (availableTokensToPurchase == 0) {
             finalization();
         }
 
@@ -335,7 +339,7 @@ contract Crowdsale is ACLManaged, CrowdsaleConfig {
     }
 
     // Updates the whitelist
-    function updateWhitelist(address _account, WhitelistPermission _permission) external onlyAdmin returns (bool) {
+    function updateWhitelist(address _account, WhitelistPermission _permission) external onlyAdminAndOps returns (bool) {
         require(_account != address(0));
         require(_permission == WhitelistPermission.PreSaleContributor || _permission == WhitelistPermission.PublicSaleContributor || _permission == WhitelistPermission.CannotContribute);
         require(!saleHasFinished());
@@ -344,6 +348,19 @@ contract Crowdsale is ACLManaged, CrowdsaleConfig {
 
         address _who = msg.sender;
         WhiteListUpdated(_who, _account, _permission);
+
+        return true;
+    }
+
+    function updateWhitelist_batch(address[] _accounts, WhitelistPermission _permission) external onlyAdminAndOps returns (bool) {
+        require(_permission == WhitelistPermission.PreSaleContributor || _permission == WhitelistPermission.PublicSaleContributor || _permission == WhitelistPermission.CannotContribute);
+        require(!saleHasFinished());
+
+        for(uint i = 0; i < _accounts.length; ++i) {
+            require(_accounts[i] != address(0));
+            whitelist[_accounts[i]] = _permission;
+            WhiteListUpdated(msg.sender, _accounts[i], _permission);
+        }
 
         return true;
     }
@@ -383,7 +400,8 @@ contract Crowdsale is ACLManaged, CrowdsaleConfig {
             return true;
         }
 
-        if (saleSupply <= totalTokensSold) {
+        uint256 availableTokensToPurchase = tokenContract.balanceOf(address(this));
+        if (availableTokensToPurchase == 0) {
             return true;
         }
 
@@ -435,15 +453,19 @@ contract Crowdsale is ACLManaged, CrowdsaleConfig {
 
         isFinalized = true;
 
-        if (totalTokensSold != saleSupply) {
-            uint256 burnable_amount = saleSupply.sub(totalTokensSold);
-            tokenContract.burn(burnable_amount);
-            saleSupply = saleSupply.sub(burnable_amount);
-            Burned(msg.sender, burnable_amount, currentTime());
+        uint256 availableTokensToPurchase = tokenContract.balanceOf(address(this));
+        
+        if (availableTokensToPurchase > 0) {
+            tokenContract.burn(availableTokensToPurchase);
+            Burned(msg.sender, availableTokensToPurchase, currentTime());
         }
 
         Finalized(msg.sender, currentTime());
 
         return true;
+    }
+
+    function saleSupply() public returns (uint256) {
+        return tokenContract.balanceOf(address(this));
     }
 }

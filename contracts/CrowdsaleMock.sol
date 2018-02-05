@@ -12,7 +12,6 @@ contract CrowdsaleMock is Crowdsale
         uint256 _start,
         uint256 _end,
         uint256 _tokensPerEther,
-        uint256 _supply,
         uint256 _min_contribution,
         uint256 _max_contribution,
         uint256 _currentTime
@@ -20,7 +19,6 @@ contract CrowdsaleMock is Crowdsale
         _now             = _currentTime;
         startTimestamp   = _start;
         endTimestamp     = _end;
-        saleSupply       = _supply;
         MIN_CONTRIBUTION = _min_contribution;
     }
 

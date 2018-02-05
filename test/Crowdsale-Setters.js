@@ -97,29 +97,11 @@ contract('Crowdsale - Setters', function ([_owner, _wallet, _another_wallet, _no
         })
     });
 
-    describe('setter sale supply', () => {
-        const random_supply = 100000;
-        it('should update the sale supply', async function() {
-            const {logs} = await sale.setSaleSupply(random_supply);
-            assert.equal(await sale.saleSupply(), random_supply);
-            const event = logs.find(e => e.event === 'SaleSupplyUpdated');
-            assert.notEqual(event, undefined);
-        });
-        it('should throw an error when trying to update the sale supply a non owner address', async () => {
-            try {
-                await sale.setSaleSupply(random_supply, {from: _normal_user});
-            } catch (error) {
-                assert(true, `Expected throw, but got ${error} instead`);
-                return;
-            }
-            assert(false, "Did not throw as expected");
-        });
-    });
     describe('setter setMinContribution', function(){
         var random_min_contribution = web3.toWei(0.5, "ether");
         it('should update min contribution', async function (){
             const {logs} = await sale.setMinContribution(random_min_contribution);
-            assert.equal((await sale.MIN_CONTRIBUTION()).toNumber(), random_min_contribution);
+            assert.equal((await sale.minContribution()).toNumber(), random_min_contribution);
             const event = logs.find(e => e.event === 'MinContributionUpdated');
             assert.notEqual(event, undefined);
         });
@@ -138,7 +120,7 @@ contract('Crowdsale - Setters', function ([_owner, _wallet, _another_wallet, _no
         var random_max_contribution = web3.toWei(2, "ether");
         it('should update max contribution', async function (){
             const {logs} = await sale.setMaxContribution(random_max_contribution);
-            assert.equal((await sale.MAX_CONTRIBUTION()).toNumber(), random_max_contribution);
+            assert.equal((await sale.maxContribution()).toNumber(), random_max_contribution);
             const event = logs.find(e => e.event === 'MaxContributionUpdated');
             assert.notEqual(event, undefined);
         });

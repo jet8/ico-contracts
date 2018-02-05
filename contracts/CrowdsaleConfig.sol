@@ -1,8 +1,9 @@
 pragma solidity ^0.4.17;
 
 import 'zeppelin-solidity/contracts/math/SafeMath.sol';
+import './J8TTokenConfig.sol';
 
-contract CrowdsaleConfig {
+contract CrowdsaleConfig is J8TTokenConfig {
     using SafeMath for uint256;
 
     // Default start token sale date is 08th March 2018
@@ -11,12 +12,6 @@ contract CrowdsaleConfig {
     // Default end token sale date is 1st July 2018
     uint256 public constant END_TIMESTAMP   = 1530403200;
 
-    // The J8T decimals
-    uint8   public constant TOKEN_DECIMALS = 8;
-
-    // The J8T decimal factor to obtain luckys
-    uint256 public constant J8T_DECIMALS_FACTOR = 10**uint256(TOKEN_DECIMALS);
-
     // The ETH decimal factor to obtain weis
     uint256 public constant ETH_DECIMALS_FACTOR = 10**uint256(18);
 
@@ -24,10 +19,10 @@ contract CrowdsaleConfig {
     uint256 public constant TOKEN_SALE_SUPPLY = 450000000 * J8T_DECIMALS_FACTOR;
 
     // The minimum contribution amount in weis
-    uint256 public constant MIN_CONTRIBUTION_WEIS = 100000000000000000; //0.1 eth
+    uint256 public constant MIN_CONTRIBUTION_WEIS = 0.1 ether;
 
     // The maximum contribution amount in weis
-    uint256 public constant MAX_CONTRIBUTION_WEIS = 100000000000000000000; //100 eth
+    uint256 public constant MAX_CONTRIBUTION_WEIS = 100 ether;
 
     //@WARNING: WORKING WITH KILO-MULTIPLES TO AVOID IMPOSSIBLE DIVISIONS OF FLOATING POINTS.
     uint256 constant dollar_per_kilo_token = 100; //0.1 dollar per token
