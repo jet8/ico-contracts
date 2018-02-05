@@ -40,26 +40,26 @@ contract ACLManaged is Ownable {
 
     //Checks if an address is owner
     function isOwner(address _address) public view returns (bool) {
-        bool isOwner = (_address == owner);
-        return isOwner;
+        bool result = (_address == owner);
+        return result;
     }
 
     //Checks if an address is operator
     function isOps(address _address) public view returns (bool) {
-        bool isOps = (_address == opsAddress);
-        return isOps;
+        bool result = (_address == opsAddress);
+        return result;
     }
 
     //Checks if an address is ops or admin
     function isOpsOrAdmin(address _address) public view returns (bool) {
-        bool isOpsOrAdmin = (_address == opsAddress || _address == adminAddress);
-        return isOpsOrAdmin;
+        bool result = (_address == opsAddress || _address == adminAddress);
+        return result;
     }
 
     //Checks if an address is ops,owner or admin
     function isOwnerOrOpsOrAdmin(address _address) public view returns (bool) {
-        bool isOwnerOrOpsOrAdmin = (_address == opsAddress || _address == adminAddress || _address == owner);
-        return isOwnerOrOpsOrAdmin;
+        bool result = (_address == opsAddress || _address == adminAddress || _address == owner);
+        return result;
     }
 
     //Checks whether the msg.sender address is equal to the adminAddress property or not

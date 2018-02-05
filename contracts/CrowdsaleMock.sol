@@ -19,7 +19,6 @@ contract CrowdsaleMock is Crowdsale
         _now             = _currentTime;
         startTimestamp   = _start;
         endTimestamp     = _end;
-        MIN_CONTRIBUTION = _min_contribution;
     }
 
     function currentTime() public view returns (uint256) {
