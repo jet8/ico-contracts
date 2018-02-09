@@ -326,8 +326,8 @@ contract('Ledger', function (accounts) {
 		});
 
 		it('should allow private contributors claim bonus tokens', async function () {
-			await ledger.claimTokens({from: accounts[1], gas: 3500000 })
-			await ledger.claimTokens({from: accounts[2], gas: 3500000 })
+			await ledger.claimBonus({from: accounts[1], gas: 3500000 })
+			await ledger.claimBonus({from: accounts[2], gas: 3500000 })
 		});
 
 		it('should send bonus allocations to all private contributors', async function () {
@@ -410,7 +410,7 @@ contract('Ledger', function (accounts) {
 
 		it('should set claim and get bonus allocation', async function () {
 			await ledger.setCanClaimBonusTokens(true, { from: accounts[0] });
-			await ledger.claimTokens({from: accounts[1], gas: 3500000})
+			await ledger.claimBonus({from: accounts[1], gas: 3500000})
 			var balance = await token.balanceOf(accounts[1])
 			var isEqual = balance.equals(allocationAmount.mul(8).add(bonusAllocationAmount.mul(2)))
 			assert(isEqual)
@@ -456,6 +456,8 @@ contract('Ledger', function (accounts) {
 			await ledger.setCanClaimBonusTokens(true, { from: accounts[0] });
 
 			await ledger.claimTokens({from: accounts[1], gas: 3500000})
+			await ledger.claimBonus({from: accounts[1], gas: 3500000})
+			
 			var balance = await token.balanceOf(accounts[1])
 			var isEqual = balance.equals(allocationAmount.mul(8).add(bonusAllocationAmount.mul(2)))
 			assert(isEqual)

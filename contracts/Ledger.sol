@@ -5,22 +5,20 @@ import './Crowdsale.sol';
 
 
 contract Ledger is ACLManaged {
-	
-	using SafeMath for uint256;
+    
+    using SafeMath for uint256;
 
     ///////////////////////
     // Ledger PROPERTIES //
     ///////////////////////
 
-	// The Allocation struct represents a token sale purchase
+    // The Allocation struct represents a token sale purchase
     // amountGranted is the amount of tokens purchased
     // hasClaimedTokens whether the allocation has been alredy claimed
-	struct Allocation {
-		uint256 amountGranted;
+    struct Allocation {
+        uint256 amountGranted;
         uint256 amountBonusGranted;
-		bool hasClaimedTokens;
-        bool hasClaimedBonusTokens;
-	}
+    }
 
     // ContributionPhase enum cases are
     // PublicContribution, the contribution has been made in the public sale phase
@@ -30,7 +28,7 @@ contract Ledger is ACLManaged {
         PublicContribution, PreSaleContribution, PartnerContribution
     }
 
-	// Map of adresses that purchased tokens on the public phase
+    // Map of adresses that purchased tokens on the public phase
     mapping(address => Allocation) public publicAllocations;
 
     // Map of adresses that purchased tokens on the presale phase
@@ -75,7 +73,10 @@ contract Ledger is ACLManaged {
     event AllocationRevoked(address _contributor, uint256 _amount, uint8 _phase);
 
     // Triggered when an allocation has been claimed
-    event AllocationClaimed(address _contributor, uint256 _amount, uint8 _phase);
+    event AllocationClaimed(address _contributor, uint256 _amount);
+
+    // Triggered when a bonus allocation has been claimed
+    event AllocationBonusClaimed(address _contributor, uint256 _amount);
 
     //////////////////////
     // Ledger FUNCTIONS //
@@ -84,8 +85,8 @@ contract Ledger is ACLManaged {
     // Ledger constructor
     // Sets default values for canClaimTokens, canClaimPresaleTokens and canClaimPartnerTokens properties
     function Ledger(J8TToken _tokenContract) public {
-    	require(address(_tokenContract) != address(0));
-    	tokenContract = _tokenContract;
+        require(address(_tokenContract) != address(0));
+        tokenContract = _tokenContract;
         canClaimTokens = false;
         canClaimPresaleTokens = false;
         canClaimPartnerTokens = false;
@@ -149,11 +150,11 @@ contract Ledger is ACLManaged {
 
     // Adds a new allocation for the contributor with address _contributor
     function addAllocation(address _contributor, uint256 _amount, uint256 _bonus, uint8 _phase) public onlyAdminAndOps returns (bool) {
-    	require(_contributor != address(0));
-    	require(_contributor != address(this));
+        require(_contributor != address(0));
+        require(_contributor != address(this));
 
-    	// Can't create or update an allocation if the amount of tokens to be allocated is not greater than zero
-    	require(_amount > 0);
+        // Can't create or update an allocation if the amount of tokens to be allocated is not greater than zero
+        require(_amount > 0);
 
         // Can't create an allocation if the contribution phase is not in the ContributionPhase enum
         ContributionPhase _contributionPhase = ContributionPhase(_phase);
@@ -169,15 +170,15 @@ contract Ledger is ACLManaged {
         // Fetch the allocation from the respective mapping and updates the granted amount of tokens
         if (_contributionPhase == ContributionPhase.PublicContribution) {
             totalGrantedAllocation = publicAllocations[_contributor].amountGranted.add(_amount);
-            publicAllocations[_contributor] = Allocation(totalGrantedAllocation, 0, false, false);
+            publicAllocations[_contributor] = Allocation(totalGrantedAllocation, 0);
         } else if (_contributionPhase == ContributionPhase.PreSaleContribution) {
             totalGrantedAllocation = presaleAllocations[_contributor].amountGranted.add(_amount);
             totalGrantedBonusAllocation = presaleAllocations[_contributor].amountBonusGranted.add(_bonus);
-            presaleAllocations[_contributor] = Allocation(totalGrantedAllocation, totalGrantedBonusAllocation, false, false);
+            presaleAllocations[_contributor] = Allocation(totalGrantedAllocation, totalGrantedBonusAllocation);
         } else if (_contributionPhase == ContributionPhase.PartnerContribution) {
             totalGrantedAllocation = partnerAllocations[_contributor].amountGranted.add(_amount);
             totalGrantedBonusAllocation = partnerAllocations[_contributor].amountBonusGranted.add(_bonus);
-            partnerAllocations[_contributor] = Allocation(totalGrantedAllocation, totalGrantedBonusAllocation, false, false);
+            partnerAllocations[_contributor] = Allocation(totalGrantedAllocation, totalGrantedBonusAllocation);
         }
 
         // Updates the contract data
@@ -205,98 +206,85 @@ contract Ledger is ACLManaged {
     // be transfered.
     // 
     // A contributor can claim its tokens after each phase has been opened
-    function claimTokens() public payable onlyAfterOpenClaim returns (bool) {
+    function claimTokens() public payable onlyClaimPhase returns (bool) {
         require(msg.sender != address(0));
-
-        uint256 currentSupply = tokenContract.balanceOf(address(this));
-        bool hasTransferedTokens = false;
-
-        // We need to check if the contributor has made a contribution on each
-        // phase, public, presale and partner
+        require(msg.sender != address(this));
 
         uint256 amountToTransfer = 0;
 
-        // If amount granted is greated than zero and the allocation hasn't
-        // been already claimed we proceed to transfer to tokens.
+        // We need to check if the contributor has made a contribution on each
+        // phase, public, presale and partner
         Allocation storage publicA = publicAllocations[msg.sender];
-        if (publicA.amountGranted > 0 && !publicA.hasClaimedTokens) {
+        if (publicA.amountGranted > 0) {
             amountToTransfer = publicA.amountGranted;
-            
-            // The amount to transfer must be less or equal to the current supply
-            require(amountToTransfer <= currentSupply);
-            require(tokenContract.transfer(msg.sender, amountToTransfer));
-
-            // We update the current supply by substracting the amount of tokens
-            // that has been transfered and we set the allocation as claimed
-            currentSupply = currentSupply.sub(amountToTransfer);
-            publicA.hasClaimedTokens = true;
-
-            AllocationClaimed(msg.sender, amountToTransfer, 0);
-            hasTransferedTokens = true;
+            publicA.amountGranted = 0;
         }
 
         Allocation storage presaleA = presaleAllocations[msg.sender];
-        if (presaleA.amountGranted > 0 && !presaleA.hasClaimedTokens && canClaimPresaleTokens) {
-            amountToTransfer = presaleA.amountGranted;
-
-            require(amountToTransfer <= currentSupply);
-            require(tokenContract.transfer(msg.sender, amountToTransfer));
-
-            currentSupply = currentSupply.sub(amountToTransfer);
-            presaleA.hasClaimedTokens = true;
-
-            AllocationClaimed(msg.sender, amountToTransfer, 1);
-            hasTransferedTokens = true;
-        }
-
-        // Transfer presale bonus allocation if possible
-        if (presaleA.amountBonusGranted > 0 && !presaleA.hasClaimedBonusTokens && canClaimBonusTokens) {
-            amountToTransfer = presaleA.amountBonusGranted;
-
-            require(amountToTransfer <= currentSupply);
-            require(tokenContract.transfer(msg.sender, amountToTransfer));
-
-            currentSupply = currentSupply.sub(amountToTransfer);
-            presaleA.hasClaimedBonusTokens = true;
-
-            AllocationClaimed(msg.sender, amountToTransfer, 1);
-            hasTransferedTokens = true;
+        if (presaleA.amountGranted > 0 && canClaimPresaleTokens) {
+            amountToTransfer = amountToTransfer.add(presaleA.amountGranted);
+            presaleA.amountGranted = 0;
         }
 
         Allocation storage partnerA = partnerAllocations[msg.sender];
-        if (partnerA.amountGranted > 0 && !partnerA.hasClaimedTokens && canClaimPartnerTokens) {
-            amountToTransfer = partnerA.amountGranted;
-
-            require(amountToTransfer <= currentSupply);
-            require(tokenContract.transfer(msg.sender, amountToTransfer));
-
-            currentSupply = currentSupply.sub(amountToTransfer);
-            partnerA.hasClaimedTokens = true;
-
-            AllocationClaimed(msg.sender, amountToTransfer, 2);
-            hasTransferedTokens = true;
+        if (partnerA.amountGranted > 0 && canClaimPartnerTokens) {
+            amountToTransfer = amountToTransfer.add(partnerA.amountGranted);
+            partnerA.amountGranted = 0;
         }
 
-        // Transfer partner bonus allocation if possible
-        if (partnerA.amountBonusGranted > 0 && !partnerA.hasClaimedBonusTokens && canClaimBonusTokens) {
-            amountToTransfer = partnerA.amountBonusGranted;
+        // The amount to transfer must greater than zero
+        require(amountToTransfer > 0);
 
-            require(amountToTransfer <= currentSupply);
-            require(tokenContract.transfer(msg.sender, amountToTransfer));
-
-            currentSupply = currentSupply.sub(amountToTransfer);
-            partnerA.hasClaimedBonusTokens = true;
-
-            AllocationClaimed(msg.sender, amountToTransfer, 1);
-            hasTransferedTokens = true;
-        }
-
-        require(hasTransferedTokens);
+        // The amount to transfer must be less or equal to the current supply
+        uint256 currentSupply = tokenContract.balanceOf(address(this));
+        require(amountToTransfer <= currentSupply);
+        
+        // Transfer the token allocation to contributor
+        require(tokenContract.transfer(msg.sender, amountToTransfer));
+        AllocationClaimed(msg.sender, amountToTransfer);
+    
         return true;
     }
 
-    modifier onlyAfterOpenClaim() {
+    function claimBonus() external payable onlyBonusClaimPhase returns (bool) {
+        require(msg.sender != address(0));
+        require(msg.sender != address(this));
+
+        uint256 amountToTransfer = 0;
+
+        Allocation storage presale = presaleAllocations[msg.sender];
+        if (presale.amountBonusGranted > 0) {
+            amountToTransfer = presale.amountBonusGranted;
+            presale.amountBonusGranted = 0;
+        }
+
+        Allocation storage partner = partnerAllocations[msg.sender];
+        if (partner.amountBonusGranted > 0) {
+            amountToTransfer = amountToTransfer.add(partner.amountBonusGranted);
+            partner.amountBonusGranted = 0;
+        }
+
+        // The amount to transfer must greater than zero
+        require(amountToTransfer > 0);
+
+        // The amount to transfer must be less or equal to the current supply
+        uint256 currentSupply = tokenContract.balanceOf(address(this));
+        require(amountToTransfer <= currentSupply);
+        
+        // Transfer the token allocation to contributor
+        require(tokenContract.transfer(msg.sender, amountToTransfer));
+        AllocationBonusClaimed(msg.sender, amountToTransfer);
+
+        return true;
+    }
+
+    modifier onlyClaimPhase() {
         require(canClaimTokens);
+        _;
+    }
+
+    modifier onlyBonusClaimPhase() {
+        require(canClaimBonusTokens);
         _;
     }
 

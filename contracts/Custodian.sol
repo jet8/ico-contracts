@@ -35,16 +35,6 @@ contract Custodian is ACLManaged, J8TTokenConfig {
 		Team, Advisors, Bounty
 	}
 
-	// Allocation struct
-	struct ProcessableAllocation {
-		address wallet;
-		uint256 amount;
-		AllocationType allocationType;
-	}
-
-	// We log all allocation
-	ProcessableAllocation[] public allocations;
-
 	// We trigger the event once the allocation has been processed
 	event ProcessableAllocationProcessed(address wallet, uint256 amount, AllocationType allocationType);
 
@@ -95,8 +85,6 @@ contract Custodian is ACLManaged, J8TTokenConfig {
 			currentBountySupply = currentBountySupply.sub(tokensToAllocate);
 		}
 
-		// We log the allocation that has been processed and trigger the ProcessableAllocationProcessed event
-		allocations.push(ProcessableAllocation(_wallet, tokensToAllocate, _allocationType));
 		ProcessableAllocationProcessed(_wallet, tokensToAllocate, _allocationType);
 
 		return true;
