@@ -8,15 +8,15 @@ contract Custodian is ACLManaged, J8TTokenConfig {
 	using SafeMath for uint256;
 
     // The team token allocation is 10% of the total token supply
-	// 		team = 1500000000*0.1 = 150000000*(10**8) luckys
+	// 		team = 1500000000*0.11 = 165000000*(10**8) luckys
 	// The advisors token allocation is 13% of the total token supply
 	// 		advisors = 1500000000*0.13 = 195000000*(10**8) luckys
 	// The bounty token allocation is 2% of the total token supply
-	// 		bounty = 1500000000*0.02 = 30000000*(10**8) luckys
+	// 		bounty = 1500000000*0.01 = 15000000*(10**8) luckys
 
-	uint256 public constant TEAM_SUPPLY = 150000000;
+	uint256 public constant TEAM_SUPPLY = 165000000;
 	uint256 public constant ADVISORS_SUPPLY = 195000000;
-	uint256 public constant BOUNTY_SUPPLY = 30000000;
+	uint256 public constant BOUNTY_SUPPLY = 15000000;
 
 
 	J8TToken public tokenContract;
@@ -43,11 +43,11 @@ contract Custodian is ACLManaged, J8TTokenConfig {
     	tokenContract = _tokenContract;
 
     	// The team token allocation is 10% of the total token supply
-    	// 		team = 1500000000*0.1 = 150000000*(10**8) luckys
+    	// 		team = 1500000000*0.11 = 165000000*(10**8) luckys
   		// The advisors token allocation is 13% of the total token supply
     	// 		advisors = 1500000000*0.13 = 195000000*(10**8) luckys
   		// The bounty token allocation is 2% of the total token supply
-    	// 		bounty = 1500000000*0.02 = 30000000*(10**8) luckys
+    	// 		bounty = 1500000000*0.01 = 15000000*(10**8) luckys
 
     	currentTeamSupply = TEAM_SUPPLY.mul(J8T_DECIMALS_FACTOR);
     	currentAdvisorsSupply = ADVISORS_SUPPLY.mul(J8T_DECIMALS_FACTOR);

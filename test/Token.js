@@ -10,13 +10,13 @@ contract('J8TToken', function(accounts) {
             assert.equal(totalSupply.toNumber(), 150000000000000000)
         });
 
-        it('should have the name Jumbo Coin', async function() {
+        it('should have the name J8T Token', async function() {
             let token = await J8TToken.new()
             let name = await token.name()
             assert.equal(name, "J8T Token", "J8T Token wasn't the name")
         });
 
-        it('should have the symbol JMB', async function() {
+        it('should have the symbol J8T', async function() {
             let token = await J8TToken.new()
             let symbol = await token.symbol()
             assert.equal(symbol, "J8T", "J8T wasn't the symbol")

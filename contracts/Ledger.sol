@@ -14,10 +14,11 @@ contract Ledger is ACLManaged {
 
     // The Allocation struct represents a token sale purchase
     // amountGranted is the amount of tokens purchased
-    // hasClaimedTokens whether the allocation has been alredy claimed
+    // hasClaimedBonusTokens whether the allocation has been alredy claimed
     struct Allocation {
         uint256 amountGranted;
         uint256 amountBonusGranted;
+        bool hasClaimedBonusTokens;
     }
 
     // ContributionPhase enum cases are
@@ -60,7 +61,12 @@ contract Ledger is ACLManaged {
     bool public canClaimPresaleTokens;
 
     // Whether the bonus token allocations can be claimed
-    bool public canClaimBonusTokens;
+    bool public canClaimPresaleBonusTokensPhase1;
+    bool public canClaimPresaleBonusTokensPhase2;
+
+    // Whether the bonus token allocations can be claimed
+    bool public canClaimPartnerBonusTokensPhase1;
+    bool public canClaimPartnerBonusTokensPhase2;
 
     ///////////////////
     // Ledger EVENTS //
@@ -78,6 +84,9 @@ contract Ledger is ACLManaged {
     // Triggered when a bonus allocation has been claimed
     event AllocationBonusClaimed(address _contributor, uint256 _amount);
 
+    // Triggered when crowdsale contract updated
+    event crowdsaleContractUpdated(address _who, address _old_address, address _new_address);
+
     //////////////////////
     // Ledger FUNCTIONS //
     //////////////////////
@@ -90,7 +99,10 @@ contract Ledger is ACLManaged {
         canClaimTokens = false;
         canClaimPresaleTokens = false;
         canClaimPartnerTokens = false;
-        canClaimBonusTokens = false;
+        canClaimPresaleBonusTokensPhase1 = false;
+        canClaimPresaleBonusTokensPhase2 = false;
+        canClaimPartnerBonusTokensPhase1 = false;
+        canClaimPartnerBonusTokensPhase2 = false;
     }
 
     function () external payable {
@@ -106,17 +118,13 @@ contract Ledger is ACLManaged {
 
         // Can't revoke  an allocation if the contribution phase is not in the ContributionPhase enum
         ContributionPhase _contributionPhase = ContributionPhase(_phase);
-        require(_contributionPhase == ContributionPhase.PublicContribution ||
-                _contributionPhase == ContributionPhase.PreSaleContribution ||
+        require(_contributionPhase == ContributionPhase.PreSaleContribution ||
                 _contributionPhase == ContributionPhase.PartnerContribution);
 
         uint256 grantedAllocation = 0;
 
         // Deletes the allocation from the respective mapping
-        if (_contributionPhase == ContributionPhase.PublicContribution) {
-            grantedAllocation = publicAllocations[_contributor].amountGranted;
-            delete publicAllocations[_contributor];
-        } else if (_contributionPhase == ContributionPhase.PreSaleContribution) {
+        if (_contributionPhase == ContributionPhase.PreSaleContribution) {
             grantedAllocation = presaleAllocations[_contributor].amountGranted.add(presaleAllocations[_contributor].amountBonusGranted);
             delete presaleAllocations[_contributor];
         } else if (_contributionPhase == ContributionPhase.PartnerContribution) {
@@ -131,14 +139,9 @@ contract Ledger is ACLManaged {
         // Updates the current supply as well as the total public allocation and
         // the total private allocation substracting the amount of tokens that has been revoked
 
-        if (_contributionPhase == ContributionPhase.PublicContribution) {
-            require(grantedAllocation <= totalPublicAllocation);
-            totalPublicAllocation = totalPublicAllocation.sub(grantedAllocation);
-        } else {
-            require(grantedAllocation <= totalPrivateAllocation);
-            totalPrivateAllocation = totalPrivateAllocation.sub(grantedAllocation);
-        }
-
+        require(grantedAllocation <= totalPrivateAllocation);
+        totalPrivateAllocation = totalPrivateAllocation.sub(grantedAllocation);
+        
         // We sent back the amount of tokens that has been revoked to the corwdsale contract
         require(tokenContract.transfer(address(crowdsaleContract), grantedAllocation));
 
@@ -170,15 +173,15 @@ contract Ledger is ACLManaged {
         // Fetch the allocation from the respective mapping and updates the granted amount of tokens
         if (_contributionPhase == ContributionPhase.PublicContribution) {
             totalGrantedAllocation = publicAllocations[_contributor].amountGranted.add(_amount);
-            publicAllocations[_contributor] = Allocation(totalGrantedAllocation, 0);
+            publicAllocations[_contributor] = Allocation(totalGrantedAllocation, 0, false);
         } else if (_contributionPhase == ContributionPhase.PreSaleContribution) {
             totalGrantedAllocation = presaleAllocations[_contributor].amountGranted.add(_amount);
             totalGrantedBonusAllocation = presaleAllocations[_contributor].amountBonusGranted.add(_bonus);
-            presaleAllocations[_contributor] = Allocation(totalGrantedAllocation, totalGrantedBonusAllocation);
+            presaleAllocations[_contributor] = Allocation(totalGrantedAllocation, totalGrantedBonusAllocation, false);
         } else if (_contributionPhase == ContributionPhase.PartnerContribution) {
             totalGrantedAllocation = partnerAllocations[_contributor].amountGranted.add(_amount);
             totalGrantedBonusAllocation = partnerAllocations[_contributor].amountBonusGranted.add(_bonus);
-            partnerAllocations[_contributor] = Allocation(totalGrantedAllocation, totalGrantedBonusAllocation);
+            partnerAllocations[_contributor] = Allocation(totalGrantedAllocation, totalGrantedBonusAllocation, false);
         }
 
         // Updates the contract data
@@ -246,20 +249,36 @@ contract Ledger is ACLManaged {
         return true;
     }
 
-    function claimBonus() external payable onlyBonusClaimPhase returns (bool) {
+    function claimBonus() external payable returns (bool) {
         require(msg.sender != address(0));
         require(msg.sender != address(this));
 
         uint256 amountToTransfer = 0;
 
+        // BONUS PHASE 1
         Allocation storage presale = presaleAllocations[msg.sender];
-        if (presale.amountBonusGranted > 0) {
-            amountToTransfer = presale.amountBonusGranted;
-            presale.amountBonusGranted = 0;
+        if (presale.amountBonusGranted > 0 && !presale.hasClaimedBonusTokens && canClaimPresaleBonusTokensPhase1) {
+            uint256 amountPresale = presale.amountBonusGranted.div(2);
+            amountToTransfer = amountPresale;
+            presale.amountBonusGranted = amountPresale;
+            presale.hasClaimedBonusTokens = true;
         }
 
         Allocation storage partner = partnerAllocations[msg.sender];
-        if (partner.amountBonusGranted > 0) {
+        if (partner.amountBonusGranted > 0 && !partner.hasClaimedBonusTokens && canClaimPartnerBonusTokensPhase1) {
+            uint256 amountPartner = partner.amountBonusGranted.div(2);
+            amountToTransfer = amountToTransfer.add(amountPartner);
+            partner.amountBonusGranted = amountPartner;
+            partner.hasClaimedBonusTokens = true;
+        }
+
+        // BONUS PHASE 2
+        if (presale.amountBonusGranted > 0 && canClaimPresaleBonusTokensPhase2) {
+            amountToTransfer = amountToTransfer.add(presale.amountBonusGranted);
+            presale.amountBonusGranted = 0;
+        }
+
+        if (partner.amountBonusGranted > 0 && canClaimPartnerBonusTokensPhase2) {
             amountToTransfer = amountToTransfer.add(partner.amountBonusGranted);
             partner.amountBonusGranted = 0;
         }
@@ -283,11 +302,6 @@ contract Ledger is ACLManaged {
         _;
     }
 
-    modifier onlyBonusClaimPhase() {
-        require(canClaimBonusTokens);
-        _;
-    }
-
     // Updates the canClaimTokens propety with the new _canClaimTokens value
     function setCanClaimTokens(bool _canClaimTokens) external onlyAdmin returns (bool) {
         canClaimTokens = _canClaimTokens;
@@ -307,14 +321,37 @@ contract Ledger is ACLManaged {
     }
 
     // Updates the canClaimBonusTokens propety with the new _canClaimTokens value
-    function setCanClaimBonusTokens(bool _canClaimTokens) external onlyAdmin returns (bool) {
-        canClaimBonusTokens = _canClaimTokens;
+    function setCanClaimPresaleBonusTokensPhase1(bool _canClaimTokens) external onlyAdmin returns (bool) {
+        canClaimPresaleBonusTokensPhase1 = _canClaimTokens;
         return true;
     }
 
-    // Updates the crowdsale contract propety with the new _crowdsaleContract value
+    // Updates the canClaimBonusTokens propety with the new _canClaimTokens value
+    function setCanClaimPresaleBonusTokensPhase2(bool _canClaimTokens) external onlyAdmin returns (bool) {
+        canClaimPresaleBonusTokensPhase2 = _canClaimTokens;
+        return true;
+    }
+
+    // Updates the canClaimBonusTokens propety with the new _canClaimTokens value
+    function setCanClaimPartnerBonusTokensPhase1(bool _canClaimTokens) external onlyAdmin returns (bool) {
+        canClaimPartnerBonusTokensPhase1 = _canClaimTokens;
+        return true;
+    }
+
+    // Updates the canClaimBonusTokens propety with the new _canClaimTokens value
+    function setCanClaimPartnerBonusTokensPhase2(bool _canClaimTokens) external onlyAdmin returns (bool) {
+        canClaimPartnerBonusTokensPhase2 = _canClaimTokens;
+        return true;
+    }
+
+    // Updates the crowdsale contract property with the new _crowdsaleContract value
     function setCrowdsaleContract(Crowdsale _crowdsaleContract) public onlyOwner returns (bool) {
+        address old_crowdsale_address = crowdsaleContract;
+
         crowdsaleContract = _crowdsaleContract;
+
+        crowdsaleContractUpdated(msg.sender, old_crowdsale_address, crowdsaleContract);
+
         return true;
     }
 }

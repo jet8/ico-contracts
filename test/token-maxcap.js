@@ -50,8 +50,9 @@ contract('Crowdsale', function (accounts) {
                 wallet,
                 { from: accounts[0], gas: 4500000 }
             );
-            await sale.forceTokensPerEther(TOKENS_PER_ETHER);
+
             await sale.setAdminAddress(accounts[0])
+            await sale.setTokensPerEther(TOKENS_PER_ETHER);
             await sale.setStartTimestamp(START_TIME);
             await sale.setEndTimestamp(END_TIME);
             await sale.setMinContribution(CONTRIBUTION_MIN);

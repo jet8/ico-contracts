@@ -148,11 +148,6 @@ contract Crowdsale is ACLManaged, CrowdsaleConfig {
         return updateTokensPerEther(_tokensPerEther);
     }
 
-    // Used for internal testing
-    function forceTokensPerEther(uint256 _tokensPerEther) external onlyOwner returns (bool) {
-        return updateTokensPerEther(_tokensPerEther);
-    }
-
     // Updates the startTimestamp propety with the new _start value
     function setStartTimestamp(uint256 _start) external onlyAdmin returns (bool) {
         require(_start < endTimestamp);
@@ -223,6 +218,10 @@ contract Crowdsale is ACLManaged, CrowdsaleConfig {
     // Updates the totalTokensSold property substracting the amount of tokens that where previously allocated
     function revokePresale(address _contributor, uint8 _contributorPhase) external payable onlyAdmin returns (bool) {
         require(_contributor != address(0));
+
+        // We can only revoke allocations from pre sale or strategic partners
+        // ContributionPhase.PreSaleContribution == 1,  ContributionPhase.PartnerContribution == 2
+        require(_contributorPhase == 1 || _contributorPhase == 2);
 
         uint256 luckys = ledgerContract.revokeAllocation(_contributor, _contributorPhase);
         
