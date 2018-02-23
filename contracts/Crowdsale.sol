@@ -222,7 +222,7 @@ contract Crowdsale is ACLManaged, CrowdsaleConfig {
 
     // Revokes a presale allocation from the contributor with address _contributor
     // Updates the totalTokensSold property substracting the amount of tokens that where previously allocated
-    function revokePresale(address _contributor, uint8 _contributorPhase) external payable onlyAdmin returns (bool) {
+    function revokePresale(address _contributor, uint8 _contributorPhase) external onlyAdmin returns (bool) {
         require(_contributor != address(0));
 
         // We can only revoke allocations from pre sale or strategic partners
@@ -241,7 +241,7 @@ contract Crowdsale is ACLManaged, CrowdsaleConfig {
 
     // Adds a new presale allocation for the contributor with address _contributor
     // We can only allocate presale before the token sale has been initialized
-    function addPresale(address _contributor, uint256 _tokens, uint256 _bonus, uint8 _contributorPhase) external payable onlyAdminAndOps onlyBeforeSale returns (bool) {
+    function addPresale(address _contributor, uint256 _tokens, uint256 _bonus, uint8 _contributorPhase) external onlyAdminAndOps onlyBeforeSale returns (bool) {
         require(_tokens > 0);
         require(_bonus > 0);
 
