@@ -145,7 +145,13 @@ contract Crowdsale is ACLManaged, CrowdsaleConfig {
 
     // Updates the tokenPerEther propety with the new _tokensPerEther value
     function setTokensPerEther(uint256 _tokensPerEther) external onlyAdmin onlyBeforeSale returns (bool) {
-        return updateTokensPerEther(_tokensPerEther);
+        require(_tokensPerEther > 0);
+
+        uint256 _oldValue = tokensPerEther;
+        tokensPerEther = _tokensPerEther;
+
+        TokensPerEtherUpdated(msg.sender, _oldValue, tokensPerEther);
+        return true;
     }
 
     // Updates the startTimestamp propety with the new _start value
@@ -220,8 +226,8 @@ contract Crowdsale is ACLManaged, CrowdsaleConfig {
         require(_contributor != address(0));
 
         // We can only revoke allocations from pre sale or strategic partners
-        // ContributionPhase.PreSaleContribution == 1,  ContributionPhase.PartnerContribution == 2
-        require(_contributorPhase == 1 || _contributorPhase == 2);
+        // ContributionPhase.PreSaleContribution == 1,  ContributionPhase.PartnerContribution == 1
+        require(_contributorPhase == 0 || _contributorPhase == 1);
 
         uint256 luckys = ledgerContract.revokeAllocation(_contributor, _contributorPhase);
         
@@ -286,7 +292,7 @@ contract Crowdsale is ACLManaged, CrowdsaleConfig {
         // We need to convert the tokensPerEther to luckys (10**8)
         uint256 luckyPerEther = tokensPerEther.mul(J8T_DECIMALS_FACTOR);
 
-        // In order to calculate the tokens amoun to be allocated to the contrbutor
+        // In order to calculate the tokens amount to be allocated to the contrbutor
         // we need to multiply the amount of wei sent by luckyPerEther and divide the
         // result for the ether decimal factor (10**18)
         uint256 tokensAmount = weiAmount.mul(luckyPerEther).div(ETH_DECIMALS_FACTOR);
@@ -308,12 +314,8 @@ contract Crowdsale is ACLManaged, CrowdsaleConfig {
         uint256 weiToPurchase = tokensToPurchase.div(tokensPerEther);
         weiRaised = weiRaised.add(weiToPurchase);
 
-        // Insert the new allocation to the Ledger
-        // we set the contribution phase as public (uint8 0)
-        // we set the bonus to 0
-        require(ledgerContract.addAllocation(contributor, tokensToPurchase, 0, 0));
         // Transfers the tokens form the Crowdsale contract to the Ledger contract
-        require(tokenContract.transfer(address(ledgerContract), tokensToPurchase));
+        require(tokenContract.transfer(contributor, tokensToPurchase));
 
         // Issue a refund for any unused ether 
         if (refund > 0) {
@@ -428,16 +430,6 @@ contract Crowdsale is ACLManaged, CrowdsaleConfig {
     // PRIVATE FUNCTIONS //
     ///////////////////////
 
-    function updateTokensPerEther(uint256 _tokensPerEther) private returns (bool) {
-        require(_tokensPerEther > 0);
-
-        uint256 _oldValue = tokensPerEther;
-        tokensPerEther = _tokensPerEther;
-
-        TokensPerEtherUpdated(msg.sender, _oldValue, tokensPerEther);
-        return true;
-    }
-
     // This method is for to be called only for the owner. This way we protect for anyone who wanna finalize the ICO.
     function finalize() external onlyAdmin returns (bool) {
         return finalization();
@@ -464,7 +456,7 @@ contract Crowdsale is ACLManaged, CrowdsaleConfig {
         return true;
     }
 
-    function saleSupply() public returns (uint256) {
+    function saleSupply() public view returns (uint256) {
         return tokenContract.balanceOf(address(this));
     }
 }

@@ -6,11 +6,11 @@ import './J8TTokenConfig.sol';
 contract CrowdsaleConfig is J8TTokenConfig {
     using SafeMath for uint256;
 
-    // Default start token sale date is 08th March 2018
-    uint256 public constant START_TIMESTAMP = 1520467200;
+    // Default start token sale date is 28th February 15:00 SGP 2018
+    uint256 public constant START_TIMESTAMP = 1519801200;
 
-    // Default end token sale date is 1st July 2018
-    uint256 public constant END_TIMESTAMP   = 1530403200;
+    // Default end token sale date is 14th March 15:00 SGP 2018
+    uint256 public constant END_TIMESTAMP   = 1521010800;
 
     // The ETH decimal factor to obtain weis
     uint256 public constant ETH_DECIMALS_FACTOR = 10**uint256(18);
@@ -26,7 +26,7 @@ contract CrowdsaleConfig is J8TTokenConfig {
 
     //@WARNING: WORKING WITH KILO-MULTIPLES TO AVOID IMPOSSIBLE DIVISIONS OF FLOATING POINTS.
     uint256 constant dollar_per_kilo_token = 100; //0.1 dollar per token
-    uint256 public constant dollars_per_kilo_ether = 400000; //400$ per ether
+    uint256 public constant dollars_per_kilo_ether = 900000; //900$ per ether
     //TOKENS_PER_ETHER = dollars_per_ether / dollar_per_token
     uint256 public constant INITIAL_TOKENS_PER_ETHER = dollars_per_kilo_ether.div(dollar_per_kilo_token);
 }

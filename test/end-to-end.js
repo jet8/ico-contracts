@@ -80,7 +80,7 @@ contract('Crowdsale - Refund', function (accounts) {
         
         // Ledger has allocated the total token sale supply
         var tokenBalance = await token.balanceOf(ledger.address)
-        var isEqual = tokenBalance.equals(TOKEN_SALE_SUPPLY)
+        var isEqual = tokenBalance.equals(0)
         assert(isEqual)
 
         // The funds wallet has received the total amount of ETH

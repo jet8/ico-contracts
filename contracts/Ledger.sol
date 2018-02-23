@@ -22,15 +22,11 @@ contract Ledger is ACLManaged {
     }
 
     // ContributionPhase enum cases are
-    // PublicContribution, the contribution has been made in the public sale phase
     // PreSaleContribution, the contribution has been made in the presale phase
     // PartnerContribution, the contribution has been made in the private phase
     enum ContributionPhase {
-        PublicContribution, PreSaleContribution, PartnerContribution
+        PreSaleContribution, PartnerContribution
     }
-
-    // Map of adresses that purchased tokens on the public phase
-    mapping(address => Allocation) public publicAllocations;
 
     // Map of adresses that purchased tokens on the presale phase
     mapping(address => Allocation) public presaleAllocations;
@@ -47,12 +43,6 @@ contract Ledger is ACLManaged {
     // Total private allocation, counting the amount of tokens from the
     // partner and the presale phase
     uint256 public totalPrivateAllocation;
-
-    // Total public allocation
-    uint256 public totalPublicAllocation;
-
-    // Whether the token allocations can be claimed on the public sale phase
-    bool public canClaimTokens;
 
     // Whether the token allocations can be claimed on the partner sale phase
     bool public canClaimPartnerTokens;
@@ -85,18 +75,20 @@ contract Ledger is ACLManaged {
     event AllocationBonusClaimed(address _contributor, uint256 _amount);
 
     // Triggered when crowdsale contract updated
-    event crowdsaleContractUpdated(address _who, address _old_address, address _new_address);
+    event CrowdsaleContractUpdated(address _who, address _old_address, address _new_address);
+
+    //Triggered when any can claim token boolean is updated. _type param indicates which is updated.
+    event CanClaimTokensUpdated(address _who, string _type, bool _oldCanClaim, bool _newCanClaim);
 
     //////////////////////
     // Ledger FUNCTIONS //
     //////////////////////
 
     // Ledger constructor
-    // Sets default values for canClaimTokens, canClaimPresaleTokens and canClaimPartnerTokens properties
+    // Sets default values for canClaimPresaleTokens and canClaimPartnerTokens properties
     function Ledger(J8TToken _tokenContract) public {
         require(address(_tokenContract) != address(0));
         tokenContract = _tokenContract;
-        canClaimTokens = false;
         canClaimPresaleTokens = false;
         canClaimPartnerTokens = false;
         canClaimPresaleBonusTokensPhase1 = false;
@@ -136,9 +128,7 @@ contract Ledger is ACLManaged {
         uint256 currentSupply = tokenContract.balanceOf(address(this));
         require(grantedAllocation <= currentSupply);
 
-        // Updates the current supply as well as the total public allocation and
-        // the total private allocation substracting the amount of tokens that has been revoked
-
+        // Updates the total private allocation substracting the amount of tokens that has been revoked
         require(grantedAllocation <= totalPrivateAllocation);
         totalPrivateAllocation = totalPrivateAllocation.sub(grantedAllocation);
         
@@ -161,8 +151,7 @@ contract Ledger is ACLManaged {
 
         // Can't create an allocation if the contribution phase is not in the ContributionPhase enum
         ContributionPhase _contributionPhase = ContributionPhase(_phase);
-        require(_contributionPhase == ContributionPhase.PublicContribution ||
-                _contributionPhase == ContributionPhase.PreSaleContribution ||
+        require(_contributionPhase == ContributionPhase.PreSaleContribution ||
                 _contributionPhase == ContributionPhase.PartnerContribution);
 
 
@@ -171,10 +160,7 @@ contract Ledger is ACLManaged {
         uint256 totalGrantedBonusAllocation = 0;
 
         // Fetch the allocation from the respective mapping and updates the granted amount of tokens
-        if (_contributionPhase == ContributionPhase.PublicContribution) {
-            totalGrantedAllocation = publicAllocations[_contributor].amountGranted.add(_amount);
-            publicAllocations[_contributor] = Allocation(totalGrantedAllocation, 0, false);
-        } else if (_contributionPhase == ContributionPhase.PreSaleContribution) {
+        if (_contributionPhase == ContributionPhase.PreSaleContribution) {
             totalGrantedAllocation = presaleAllocations[_contributor].amountGranted.add(_amount);
             totalGrantedBonusAllocation = presaleAllocations[_contributor].amountBonusGranted.add(_bonus);
             presaleAllocations[_contributor] = Allocation(totalGrantedAllocation, totalGrantedBonusAllocation, false);
@@ -185,11 +171,7 @@ contract Ledger is ACLManaged {
         }
 
         // Updates the contract data
-        if (_contributionPhase == ContributionPhase.PublicContribution) {
-            totalPublicAllocation = totalPublicAllocation.add(totalAmount);
-        } else {
-            totalPrivateAllocation = totalPrivateAllocation.add(totalAmount);
-        }
+        totalPrivateAllocation = totalPrivateAllocation.add(totalAmount);
 
         AllocationGranted(_contributor, totalAmount, _phase);
 
@@ -209,7 +191,7 @@ contract Ledger is ACLManaged {
     // be transfered.
     // 
     // A contributor can claim its tokens after each phase has been opened
-    function claimTokens() public payable onlyClaimPhase returns (bool) {
+    function claimTokens() public payable returns (bool) {
         require(msg.sender != address(0));
         require(msg.sender != address(this));
 
@@ -217,12 +199,6 @@ contract Ledger is ACLManaged {
 
         // We need to check if the contributor has made a contribution on each
         // phase, public, presale and partner
-        Allocation storage publicA = publicAllocations[msg.sender];
-        if (publicA.amountGranted > 0) {
-            amountToTransfer = publicA.amountGranted;
-            publicA.amountGranted = 0;
-        }
-
         Allocation storage presaleA = presaleAllocations[msg.sender];
         if (presaleA.amountGranted > 0 && canClaimPresaleTokens) {
             amountToTransfer = amountToTransfer.add(presaleA.amountGranted);
@@ -297,50 +273,51 @@ contract Ledger is ACLManaged {
         return true;
     }
 
-    modifier onlyClaimPhase() {
-        require(canClaimTokens);
-        _;
-    }
-
-    // Updates the canClaimTokens propety with the new _canClaimTokens value
-    function setCanClaimTokens(bool _canClaimTokens) external onlyAdmin returns (bool) {
-        canClaimTokens = _canClaimTokens;
-        return true;
-    }
-
     // Updates the canClaimPresaleTokens propety with the new _canClaimTokens value
     function setCanClaimPresaleTokens(bool _canClaimTokens) external onlyAdmin returns (bool) {
+        bool _oldCanClaim = canClaimPresaleTokens;
         canClaimPresaleTokens = _canClaimTokens;
+        CanClaimTokensUpdated(msg.sender, 'canClaimPresaleTokens', _oldCanClaim, _canClaimTokens);
         return true;
     }
 
-    // Updates the canClaimPartnerTokens propety with the new _canClaimTokens value
+    // Updates the canClaimPartnerTokens property with the new _canClaimTokens value
     function setCanClaimPartnerTokens(bool _canClaimTokens) external onlyAdmin returns (bool) {
+        bool _oldCanClaim = canClaimPartnerTokens;
         canClaimPartnerTokens = _canClaimTokens;
+        CanClaimTokensUpdated(msg.sender, 'canClaimPartnerTokens', _oldCanClaim, _canClaimTokens);
         return true;
     }
 
-    // Updates the canClaimBonusTokens propety with the new _canClaimTokens value
+    // Updates the canClaimBonusTokens property with the new _canClaimTokens value
     function setCanClaimPresaleBonusTokensPhase1(bool _canClaimTokens) external onlyAdmin returns (bool) {
+        bool _oldCanClaim = canClaimPresaleBonusTokensPhase1;
         canClaimPresaleBonusTokensPhase1 = _canClaimTokens;
+        CanClaimTokensUpdated(msg.sender, 'canClaimPresaleBonusTokensPhase1', _oldCanClaim, _canClaimTokens);
         return true;
     }
 
-    // Updates the canClaimBonusTokens propety with the new _canClaimTokens value
+    // Updates the canClaimBonusTokens property with the new _canClaimTokens value
     function setCanClaimPresaleBonusTokensPhase2(bool _canClaimTokens) external onlyAdmin returns (bool) {
+        bool _oldCanClaim = canClaimPresaleBonusTokensPhase2;
         canClaimPresaleBonusTokensPhase2 = _canClaimTokens;
+        CanClaimTokensUpdated(msg.sender, 'canClaimPresaleBonusTokensPhase2', _oldCanClaim, _canClaimTokens);
         return true;
     }
 
-    // Updates the canClaimBonusTokens propety with the new _canClaimTokens value
+    // Updates the canClaimBonusTokens property with the new _canClaimTokens value
     function setCanClaimPartnerBonusTokensPhase1(bool _canClaimTokens) external onlyAdmin returns (bool) {
+        bool _oldCanClaim = canClaimPartnerBonusTokensPhase1;
         canClaimPartnerBonusTokensPhase1 = _canClaimTokens;
+        CanClaimTokensUpdated(msg.sender, 'canClaimPartnerBonusTokensPhase1', _oldCanClaim, _canClaimTokens);
         return true;
     }
 
-    // Updates the canClaimBonusTokens propety with the new _canClaimTokens value
+    // Updates the canClaimBonusTokens property with the new _canClaimTokens value
     function setCanClaimPartnerBonusTokensPhase2(bool _canClaimTokens) external onlyAdmin returns (bool) {
+        bool _oldCanClaim = canClaimPartnerBonusTokensPhase2;
         canClaimPartnerBonusTokensPhase2 = _canClaimTokens;
+        CanClaimTokensUpdated(msg.sender, 'canClaimPartnerBonusTokensPhase2', _oldCanClaim, _canClaimTokens);
         return true;
     }
 
@@ -350,7 +327,7 @@ contract Ledger is ACLManaged {
 
         crowdsaleContract = _crowdsaleContract;
 
-        crowdsaleContractUpdated(msg.sender, old_crowdsale_address, crowdsaleContract);
+        CrowdsaleContractUpdated(msg.sender, old_crowdsale_address, crowdsaleContract);
 
         return true;
     }
