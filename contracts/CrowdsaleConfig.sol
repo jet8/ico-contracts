@@ -22,7 +22,7 @@ contract CrowdsaleConfig is J8TTokenConfig {
     uint256 public constant MIN_CONTRIBUTION_WEIS = 0.1 ether;
 
     // The maximum contribution amount in weis
-    uint256 public constant MAX_CONTRIBUTION_WEIS = 100 ether;
+    uint256 public constant MAX_CONTRIBUTION_WEIS = 8 ether;
 
     //@WARNING: WORKING WITH KILO-MULTIPLES TO AVOID IMPOSSIBLE DIVISIONS OF FLOATING POINTS.
     uint256 constant dollar_per_kilo_token = 100; //0.1 dollar per token

@@ -286,8 +286,8 @@ contract Crowdsale is ACLManaged, CrowdsaleConfig {
         // The weiAmount cannot be greater than maxContribution
         require(weiAmount <= maxContribution);
         // The availableTokensToPurchase must be greater than 0
-        uint256 availableTokensToPurchase = tokenContract.balanceOf(address(this));
-        require(availableTokensToPurchase > 0);
+        require(totalTokensSold < TOKEN_SALE_SUPPLY);
+        uint256 availableTokensToPurchase = TOKEN_SALE_SUPPLY.sub(totalTokensSold);
 
         // We need to convert the tokensPerEther to luckys (10**8)
         uint256 luckyPerEther = tokensPerEther.mul(J8T_DECIMALS_FACTOR);
@@ -331,8 +331,7 @@ contract Crowdsale is ACLManaged, CrowdsaleConfig {
         TokensPurchased(contributor, tokensToPurchase);
 
         // If we reach the total amount of tokens to sell we finilize the token sale
-        availableTokensToPurchase = tokenContract.balanceOf(address(this));
-        if (availableTokensToPurchase == 0) {
+        if (totalTokensSold == TOKEN_SALE_SUPPLY) {
             finalization();
         }
 
@@ -401,8 +400,7 @@ contract Crowdsale is ACLManaged, CrowdsaleConfig {
             return true;
         }
 
-        uint256 availableTokensToPurchase = tokenContract.balanceOf(address(this));
-        if (availableTokensToPurchase == 0) {
+        if (totalTokensSold == TOKEN_SALE_SUPPLY) {
             return true;
         }
 
@@ -444,11 +442,11 @@ contract Crowdsale is ACLManaged, CrowdsaleConfig {
 
         isFinalized = true;
 
-        uint256 availableTokensToPurchase = tokenContract.balanceOf(address(this));
         
-        if (availableTokensToPurchase > 0) {
-            tokenContract.burn(availableTokensToPurchase);
-            Burned(msg.sender, availableTokensToPurchase, currentTime());
+        if (totalTokensSold < TOKEN_SALE_SUPPLY) {
+            uint256 toBurn = TOKEN_SALE_SUPPLY.sub(totalTokensSold);
+            tokenContract.burn(toBurn);
+            Burned(msg.sender, toBurn, currentTime());
         }
 
         Finalized(msg.sender, currentTime());

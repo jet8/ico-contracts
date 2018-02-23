@@ -17,14 +17,14 @@ contract('Crowdsale - Finalization', function (accounts) {
 
     const END_TIME                  = Moment().add('1', 'days').unix();
     const MIN_ETH                   = 0.1
-    const MAX_ETH                   = 10
+    const MAX_ETH                   = 1
     const CONTRIBUTION_MIN          = web3.toWei(MIN_ETH, "ether")
     const CONTRIBUTION_MAX          = web3.toWei(MAX_ETH, "ether")
 
     const dollar_per_token   = 0.01;
-    const dollars_per_ether  = 400;
+    const dollars_per_ether  = 2000000;
     const TOKENS_PER_ETHER   = new BigNumber(dollars_per_ether / dollar_per_token);
-    const TOKEN_SALE_SUPPLY  = new BigNumber('1100000').mul(DECIMALSFACTOR);
+    const TOKEN_SALE_SUPPLY  = new BigNumber('450000000').mul(DECIMALSFACTOR);
     const contributorAddress = accounts[1]
     const wallet = accounts[9];
 
