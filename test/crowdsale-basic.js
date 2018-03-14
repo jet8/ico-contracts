@@ -157,27 +157,34 @@ contract('Crowdsale', function (accounts) {
             });
 
             it('should allow pre-sale contributor purchase tokens', async function () {
+                let before_tokenBalance = await token.balanceOf(accounts[1]);
+
                 var timestamp = Moment().add('1', 'second').unix();
                 await sale.setStartTimestamp(timestamp);
                 await sleep(3000);
                 let contributorPermissions = 1 // 1 equals to WhitelistPermission.PreSaleContributor
                 await sale.updateWhitelist(accounts[1], contributorPermissions, {from: accounts[0]})
                 await sale.purchaseTokens({from: accounts[1], value: CONTRIBUTION_MIN})
-                
-                var tokenBalance = await token.balanceOf(ledger.address)
-                accomulatedTokens = accomulatedTokens.add(TOKENS_PER_WEI.mul(MIN_ETH))
-                var isEqual = tokenBalance.equals(accomulatedTokens)
+
+                let transfered_tokens = TOKENS_PER_WEI.mul(MIN_ETH);
+                let expected_tokenBalance = before_tokenBalance.add(transfered_tokens);
+                let after_tokenBalance = await token.balanceOf(accounts[1]);
+                let isEqual = after_tokenBalance.equals(expected_tokenBalance)
                 assert(isEqual)
             });
 
             it('should allow public sale contributor purchase tokens', async function () {
+                let before_tokenBalance = await token.balanceOf(accounts[2]);
+
                 let contributorPermissions = 2 // 2 equals to WhitelistPermission.PublicSaleContributor
                 await sale.updateWhitelist(accounts[2], contributorPermissions, {from: accounts[0]})
                 await sale.purchaseTokens({from: accounts[2], value: CONTRIBUTION_MAX})
-                
-                var tokenBalance = await token.balanceOf(ledger.address)
-                accomulatedTokens = accomulatedTokens.add(TOKENS_PER_WEI.mul(MAX_ETH))
-                assert(tokenBalance.equals(accomulatedTokens))
+
+                let transfered_tokens = TOKENS_PER_WEI.mul(MAX_ETH);
+                let expected_tokenBalance = before_tokenBalance.add(transfered_tokens);
+                let after_tokenBalance = await token.balanceOf(accounts[2]);
+                let isEqual = after_tokenBalance.equals(expected_tokenBalance)
+                assert(isEqual)
             });
 
             it('should not allow blacklisted contributor purchase tokens', async function () {
@@ -286,8 +293,8 @@ contract('Crowdsale', function (accounts) {
                 var saleBalance = await token.balanceOf(sale.address)
                 var ledgerBalance = await token.balanceOf(ledger.address)
 
-                await sale.addPresale(accounts[1], tokensAmount, bonusTokensAmount, 2, {from: accounts[0]})
-                
+                await sale.addPresale(accounts[1], tokensAmount, bonusTokensAmount, 1, {from: accounts[0]})
+
                 var currentSaleBalance = await token.balanceOf(sale.address)
                 var currentLedgerBalance = await token.balanceOf(ledger.address)
 
@@ -323,21 +330,20 @@ contract('Crowdsale', function (accounts) {
             })
 
             // Contribution Phases
-            // Public = 0
-            // Presale = 1
-            // Partner = 2
+            // Presale = 0
+            // Partner = 1
 
             it('should add presales', async function () {
+                await sale.addPresale(accounts[1], tokensAmount, bonusTokensAmount, 0, {from: accounts[0]})
                 await sale.addPresale(accounts[1], tokensAmount, bonusTokensAmount, 1, {from: accounts[0]})
-                await sale.addPresale(accounts[1], tokensAmount, bonusTokensAmount, 2, {from: accounts[0]})
-                await sale.addPresale(accounts[2], tokensAmount, bonusTokensAmount, 2, {from: accounts[0]})
+                await sale.addPresale(accounts[2], tokensAmount, bonusTokensAmount, 1, {from: accounts[0]})
             });
 
             it('should revoke presale allocation', async function () {
                 var saleBalance = await token.balanceOf(sale.address)
                 var ledgerBalance = await token.balanceOf(ledger.address)
 
-                await sale.revokePresale(accounts[1], 1, {from: accounts[0]})
+                await sale.revokePresale(accounts[1], 0, {from: accounts[0]})
                 
                 var currentSaleBalance = await token.balanceOf(sale.address)
                 var isEqual = currentSaleBalance.equals(saleBalance.add(tokensAmount.add(bonusTokensAmount).mul(DECIMALSFACTOR)))
@@ -352,7 +358,7 @@ contract('Crowdsale', function (accounts) {
                 var saleBalance = await token.balanceOf(sale.address)
                 var ledgerBalance = await token.balanceOf(ledger.address)
 
-                await sale.revokePresale(accounts[1], 2, {from: accounts[0]})
+                await sale.revokePresale(accounts[1], 1, {from: accounts[0]})
                 
                 var currentSaleBalance = await token.balanceOf(sale.address)
                 var isEqual = currentSaleBalance.equals(saleBalance.add(tokensAmount.add(bonusTokensAmount).mul(DECIMALSFACTOR)))
@@ -362,7 +368,7 @@ contract('Crowdsale', function (accounts) {
                 isEqual = currentLedgerBalance.equals(ledgerBalance.sub(tokensAmount.add(bonusTokensAmount).mul(DECIMALSFACTOR)))
                 assert(isEqual)
 
-                await sale.revokePresale(accounts[2], 2, {from: accounts[0]})
+                await sale.revokePresale(accounts[2], 1, {from: accounts[0]})
 
                 currentSaleBalance = await token.balanceOf(sale.address)
                 isEqual = currentSaleBalance.equals(saleBalance.add(tokensAmount.add(bonusTokensAmount).mul(DECIMALSFACTOR).mul(2)))
@@ -375,7 +381,7 @@ contract('Crowdsale', function (accounts) {
 
             it('should not revoke a partner allocation', async function () {
                 try {
-                    await sale.revokePresale(accounts[2], 2, {from: accounts[0]})
+                    await sale.revokePresale(accounts[2], 1, {from: accounts[0]})
                 } catch (error) {
                     assert(true, `Expected throw, but got ${error} instead`);
 

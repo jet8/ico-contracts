@@ -114,12 +114,11 @@ contract Crowdsale is ACLManaged, CrowdsaleConfig {
         address _wallet
     ) public
     {
-        uint256 _start            = START_TIMESTAMP;
-        uint256 _end              = END_TIMESTAMP;
-        uint256 _supply           = TOKEN_SALE_SUPPLY;
-        uint256 _min_contribution = MIN_CONTRIBUTION_WEIS;
-        uint256 _max_contribution = MAX_CONTRIBUTION_WEIS;
-        uint256 _tokensPerEther   = INITIAL_TOKENS_PER_ETHER;
+        uint256 _start = START_TIMESTAMP;
+        uint256 _end = END_TIMESTAMP;
+        uint256 _minContribution = MIN_CONTRIBUTION_WEIS;
+        uint256 _maxContribution = MAX_CONTRIBUTION_WEIS;
+        uint256 _tokensPerEther = INITIAL_TOKENS_PER_ETHER;
 
         require(_start > currentTime());
         require(_end > _start);
@@ -128,24 +127,30 @@ contract Crowdsale is ACLManaged, CrowdsaleConfig {
         require(address(_ledgerContract) != address(0));
         require(_wallet != address(0));
 
-        ledgerContract   = _ledgerContract;
-        tokenContract    = _tokenContract;
-        startTimestamp   = _start;
-        endTimestamp     = _end;
-        tokensPerEther   = _tokensPerEther;
-        minContribution = _min_contribution;
-        maxContribution = _max_contribution;
-        wallet           = _wallet;
-        totalTokensSold  = 0;
-        weiRaised        = 0;
-        isFinalized      = false;  
+        ledgerContract = _ledgerContract;
+        tokenContract = _tokenContract;
+        startTimestamp = _start;
+        endTimestamp = _end;
+        tokensPerEther = _tokensPerEther;
+        minContribution = _minContribution;
+        maxContribution = _maxContribution;
+        wallet = _wallet;
+        totalTokensSold = 0;
+        weiRaised = 0;
+        isFinalized = false;  
 
         ContractCreated();
     }
 
     // Updates the tokenPerEther propety with the new _tokensPerEther value
     function setTokensPerEther(uint256 _tokensPerEther) external onlyAdmin onlyBeforeSale returns (bool) {
-        return updateTokensPerEther(_tokensPerEther);
+        require(_tokensPerEther > 0);
+
+        uint256 _oldValue = tokensPerEther;
+        tokensPerEther = _tokensPerEther;
+
+        TokensPerEtherUpdated(msg.sender, _oldValue, tokensPerEther);
+        return true;
     }
 
     // Updates the startTimestamp propety with the new _start value
@@ -216,12 +221,12 @@ contract Crowdsale is ACLManaged, CrowdsaleConfig {
 
     // Revokes a presale allocation from the contributor with address _contributor
     // Updates the totalTokensSold property substracting the amount of tokens that where previously allocated
-    function revokePresale(address _contributor, uint8 _contributorPhase) external payable onlyAdmin returns (bool) {
+    function revokePresale(address _contributor, uint8 _contributorPhase) external onlyAdmin returns (bool) {
         require(_contributor != address(0));
 
         // We can only revoke allocations from pre sale or strategic partners
-        // ContributionPhase.PreSaleContribution == 1,  ContributionPhase.PartnerContribution == 2
-        require(_contributorPhase == 1 || _contributorPhase == 2);
+        // ContributionPhase.PreSaleContribution == 0,  ContributionPhase.PartnerContribution == 1
+        require(_contributorPhase == 0 || _contributorPhase == 1);
 
         uint256 luckys = ledgerContract.revokeAllocation(_contributor, _contributorPhase);
         
@@ -235,7 +240,7 @@ contract Crowdsale is ACLManaged, CrowdsaleConfig {
 
     // Adds a new presale allocation for the contributor with address _contributor
     // We can only allocate presale before the token sale has been initialized
-    function addPresale(address _contributor, uint256 _tokens, uint256 _bonus, uint8 _contributorPhase) external payable onlyAdminAndOps onlyBeforeSale returns (bool) {
+    function addPresale(address _contributor, uint256 _tokens, uint256 _bonus, uint8 _contributorPhase) external onlyAdminAndOps onlyBeforeSale returns (bool) {
         require(_tokens > 0);
         require(_bonus > 0);
 
@@ -280,13 +285,13 @@ contract Crowdsale is ACLManaged, CrowdsaleConfig {
         // The weiAmount cannot be greater than maxContribution
         require(weiAmount <= maxContribution);
         // The availableTokensToPurchase must be greater than 0
-        uint256 availableTokensToPurchase = tokenContract.balanceOf(address(this));
-        require(availableTokensToPurchase > 0);
+        require(totalTokensSold < TOKEN_SALE_SUPPLY);
+        uint256 availableTokensToPurchase = TOKEN_SALE_SUPPLY.sub(totalTokensSold);
 
         // We need to convert the tokensPerEther to luckys (10**8)
         uint256 luckyPerEther = tokensPerEther.mul(J8T_DECIMALS_FACTOR);
 
-        // In order to calculate the tokens amoun to be allocated to the contrbutor
+        // In order to calculate the tokens amount to be allocated to the contrbutor
         // we need to multiply the amount of wei sent by luckyPerEther and divide the
         // result for the ether decimal factor (10**18)
         uint256 tokensAmount = weiAmount.mul(luckyPerEther).div(ETH_DECIMALS_FACTOR);
@@ -308,12 +313,8 @@ contract Crowdsale is ACLManaged, CrowdsaleConfig {
         uint256 weiToPurchase = tokensToPurchase.div(tokensPerEther);
         weiRaised = weiRaised.add(weiToPurchase);
 
-        // Insert the new allocation to the Ledger
-        // we set the contribution phase as public (uint8 0)
-        // we set the bonus to 0
-        require(ledgerContract.addAllocation(contributor, tokensToPurchase, 0, 0));
-        // Transfers the tokens form the Crowdsale contract to the Ledger contract
-        require(tokenContract.transfer(address(ledgerContract), tokensToPurchase));
+        // Transfers the tokens form the Crowdsale contract to contriutors wallet
+        require(tokenContract.transfer(contributor, tokensToPurchase));
 
         // Issue a refund for any unused ether 
         if (refund > 0) {
@@ -329,8 +330,7 @@ contract Crowdsale is ACLManaged, CrowdsaleConfig {
         TokensPurchased(contributor, tokensToPurchase);
 
         // If we reach the total amount of tokens to sell we finilize the token sale
-        availableTokensToPurchase = tokenContract.balanceOf(address(this));
-        if (availableTokensToPurchase == 0) {
+        if (totalTokensSold == TOKEN_SALE_SUPPLY) {
             finalization();
         }
 
@@ -399,8 +399,7 @@ contract Crowdsale is ACLManaged, CrowdsaleConfig {
             return true;
         }
 
-        uint256 availableTokensToPurchase = tokenContract.balanceOf(address(this));
-        if (availableTokensToPurchase == 0) {
+        if (totalTokensSold == TOKEN_SALE_SUPPLY) {
             return true;
         }
 
@@ -428,16 +427,6 @@ contract Crowdsale is ACLManaged, CrowdsaleConfig {
     // PRIVATE FUNCTIONS //
     ///////////////////////
 
-    function updateTokensPerEther(uint256 _tokensPerEther) private returns (bool) {
-        require(_tokensPerEther > 0);
-
-        uint256 _oldValue = tokensPerEther;
-        tokensPerEther = _tokensPerEther;
-
-        TokensPerEtherUpdated(msg.sender, _oldValue, tokensPerEther);
-        return true;
-    }
-
     // This method is for to be called only for the owner. This way we protect for anyone who wanna finalize the ICO.
     function finalize() external onlyAdmin returns (bool) {
         return finalization();
@@ -452,11 +441,11 @@ contract Crowdsale is ACLManaged, CrowdsaleConfig {
 
         isFinalized = true;
 
-        uint256 availableTokensToPurchase = tokenContract.balanceOf(address(this));
         
-        if (availableTokensToPurchase > 0) {
-            tokenContract.burn(availableTokensToPurchase);
-            Burned(msg.sender, availableTokensToPurchase, currentTime());
+        if (totalTokensSold < TOKEN_SALE_SUPPLY) {
+            uint256 toBurn = TOKEN_SALE_SUPPLY.sub(totalTokensSold);
+            tokenContract.burn(toBurn);
+            Burned(msg.sender, toBurn, currentTime());
         }
 
         Finalized(msg.sender, currentTime());
@@ -464,7 +453,7 @@ contract Crowdsale is ACLManaged, CrowdsaleConfig {
         return true;
     }
 
-    function saleSupply() public returns (uint256) {
+    function saleSupply() public view returns (uint256) {
         return tokenContract.balanceOf(address(this));
     }
 }

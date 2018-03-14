@@ -22,9 +22,9 @@ import './J8TTokenConfig.sol';
 //////////////////////////////////////////////////////////////////////
 
 contract J8TToken is J8TTokenConfig, BurnableToken, Ownable {
-	string public constant name            = "J8T Token";
-	string public constant symbol          = "J8T";
-	uint256 public constant decimals       = TOKEN_DECIMALS;
+	string public constant name = "J8T Token";
+	string public constant symbol = "J8T";
+	uint256 public constant decimals = TOKEN_DECIMALS;
 	uint256 public constant INITIAL_SUPPLY = 1500000000 * (10 ** uint256(decimals));
 
     event Transfer(address indexed _from, address indexed _to, uint256 _value);

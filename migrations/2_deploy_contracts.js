@@ -23,7 +23,7 @@ module.exports = function(deployer, network, accounts) {
 
   var tokenSaleWallet = "0xf2d51029d38656DB1D4d6446A2030c73bEfA0242"
   var foundationWallet = "0xf2d51029d38656DB1D4d6446A2030c73bEfA0242"
-  var adminAddress = "0xAF54477348B0f1A5E4d054d6d13eA9A20ffBE8d4"
+  var adminAddress = "0x8c5A5F87D0235fd9d4bd7d203295dF64B61a1867"
   var opsAddress = "0xAF54477348B0f1A5E4d054d6d13eA9A20ffBE8d4"
 
 	return deployer.deploy(J8TToken, { from: accounts[0], gas: 4700000 }).then(() => {

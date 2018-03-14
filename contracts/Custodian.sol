@@ -8,15 +8,15 @@ contract Custodian is ACLManaged, J8TTokenConfig {
 	using SafeMath for uint256;
 
     // The team token allocation is 10% of the total token supply
-	// 		team = 1500000000*0.11 = 165000000*(10**8) luckys
+	// 		team = 1500000000*0.12 = 180000000*(10**8) luckys
 	// The advisors token allocation is 13% of the total token supply
-	// 		advisors = 1500000000*0.13 = 195000000*(10**8) luckys
+	// 		advisors = 1500000000*0.11 = 165000000*(10**8) luckys
 	// The bounty token allocation is 2% of the total token supply
-	// 		bounty = 1500000000*0.01 = 15000000*(10**8) luckys
+	// 		bounty = 1500000000*0.02 = 30000000*(10**8) luckys
 
-	uint256 public constant TEAM_SUPPLY = 165000000;
-	uint256 public constant ADVISORS_SUPPLY = 195000000;
-	uint256 public constant BOUNTY_SUPPLY = 15000000;
+	uint256 public constant TEAM_SUPPLY = 180000000;
+	uint256 public constant ADVISORS_SUPPLY = 165000000;
+	uint256 public constant BOUNTY_SUPPLY = 30000000;
 
 
 	J8TToken public tokenContract;
@@ -28,8 +28,8 @@ contract Custodian is ACLManaged, J8TTokenConfig {
 
 	// Each token distribution is represented by the AllocationType enum
 	// There are three types of allocation:
-	// Team - 10% token supply
-	// Advisors - 13% token supply
+	// Team - 12% token supply
+	// Advisors - 11% token supply
 	// Bounty - 2% token supply
 	enum AllocationType {
 		Team, Advisors, Bounty
@@ -43,11 +43,11 @@ contract Custodian is ACLManaged, J8TTokenConfig {
     	tokenContract = _tokenContract;
 
     	// The team token allocation is 10% of the total token supply
-    	// 		team = 1500000000*0.11 = 165000000*(10**8) luckys
+    	// 		team = 1500000000*0.12 = 180000000*(10**8) luckys
   		// The advisors token allocation is 13% of the total token supply
-    	// 		advisors = 1500000000*0.13 = 195000000*(10**8) luckys
+    	// 		advisors = 1500000000*0.11 = 165000000*(10**8) luckys
   		// The bounty token allocation is 2% of the total token supply
-    	// 		bounty = 1500000000*0.01 = 15000000*(10**8) luckys
+    	// 		bounty = 1500000000*0.02 = 30000000*(10**8) luckys
 
     	currentTeamSupply = TEAM_SUPPLY.mul(J8T_DECIMALS_FACTOR);
     	currentAdvisorsSupply = ADVISORS_SUPPLY.mul(J8T_DECIMALS_FACTOR);
@@ -56,20 +56,15 @@ contract Custodian is ACLManaged, J8TTokenConfig {
 
 	function transferAllocation(uint256 _amount, address _wallet, AllocationType _allocationType) external onlyAdmin returns (bool) {
 		require(_wallet != address(0));
+
 		require(_amount > 0);
-		require(_allocationType == AllocationType.Team ||
-				_allocationType == AllocationType.Bounty || 
-				_allocationType == AllocationType.Advisors);
+		require(_allocationType == AllocationType.Team || _allocationType == AllocationType.Bounty || _allocationType == AllocationType.Advisors);
 
 		// We need to convert the amount of tokens to all J8T token decimal factor, 10**8 lucky
 		uint256 tokensToAllocate = _amount.mul(J8T_DECIMALS_FACTOR);
 
 
 		// We need to update the allocation supply and tranfer the J8T tokens to the wallet
-		// There are three types of allocation:
-		// Team - 10% token supply
-		// Advisors - 12% token supply
-		// Bounty - 2% token supply
 
 		if (_allocationType == AllocationType.Team) {
 			require(tokensToAllocate <= currentTeamSupply);

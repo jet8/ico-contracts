@@ -74,32 +74,22 @@ contract('Ledger', function (accounts) {
 
 		it('should trigger event when setCrowdsaleContract is called', async function (){
             const {logs} = await ledger.setCrowdsaleContract(sale.address, {from: accounts[0], gas: 3500000 });
-            const event_finalized  = logs.find(e => e.event === "crowdsaleContractUpdated");
+            const event_finalized  = logs.find(e => e.event === "CrowdsaleContractUpdated");
             assert.notEqual(event_finalized, undefined);
 		});
 
         it('should add allocations', async function () {
-        	await ledger.addAllocation(accounts[1], allocationAmount, 0, 0, {from: accounts[0], gas: 3500000 })
+        	await ledger.addAllocation(accounts[1], allocationAmount, bonusAllocationAmount, 0, {from: accounts[0], gas: 3500000 })
+        	await ledger.addAllocation(accounts[1], allocationAmount, bonusAllocationAmount, 0, {from: accounts[0], gas: 3500000 })
         	await ledger.addAllocation(accounts[1], allocationAmount, bonusAllocationAmount, 1, {from: accounts[0], gas: 3500000 })
-        	await ledger.addAllocation(accounts[1], allocationAmount, bonusAllocationAmount, 1, {from: accounts[0], gas: 3500000 })
-        	await ledger.addAllocation(accounts[1], allocationAmount, bonusAllocationAmount, 2, {from: accounts[0], gas: 3500000 })
         });
 
-    	it('should not revoke public allocation', async function () {
-    		try {
-				await ledger.revokeAllocation(accounts[1], 0, {from: accounts[0], gas: 3500000 })
-	 		} catch (error) {
-	 			assert(true, `Expected throw, but got ${error} instead`)
-	 			return
-	 		}
-	 		assert(false, "Did not throw as expected");
-    	});
 
     	it('should revoke presale allocation', async function () {
     		var ledgerSupply = await token.balanceOf(ledger.address)
     		var privateSupply = await ledger.totalPrivateAllocation()
 
-    		await ledger.revokeAllocation(accounts[1], 1, {from: accounts[0], gas: 3500000 })
+    		await ledger.revokeAllocation(accounts[1], 0, {from: accounts[0], gas: 3500000 })
 
     		var currentLedgerSupply = await token.balanceOf(ledger.address)
     		var isEqual = currentLedgerSupply.equals(ledgerSupply.sub(allocationAmount.mul(2).add(bonusAllocationAmount.mul(2))))
@@ -117,7 +107,7 @@ contract('Ledger', function (accounts) {
     	it('should revoke partner allocation', async function () {
     		var ledgerSupply = await token.balanceOf(ledger.address)
 
-    		await ledger.revokeAllocation(accounts[1], 2, {from: accounts[0], gas: 3500000 })
+    		await ledger.revokeAllocation(accounts[1], 1, {from: accounts[0], gas: 3500000 })
 
     		var currentLedgerSupply = await token.balanceOf(ledger.address)
     		var isEqual = currentLedgerSupply.equals(ledgerSupply.sub(allocationAmount.add(bonusAllocationAmount)))
@@ -144,12 +134,15 @@ contract('Ledger', function (accounts) {
 		});
 
 		it('should let add allocations', async function () {
-        	await ledger.addAllocation(accounts[1], allocationAmount, 0, 0, {from: accounts[0], gas: 3500000 })
-        	await ledger.addAllocation(accounts[2], allocationAmount, 0, 0, {from: accounts[0], gas: 3500000 })
+        	await ledger.addAllocation(accounts[1], allocationAmount, bonusAllocationAmount, 0, {from: accounts[0], gas: 3500000 })
+        	await ledger.addAllocation(accounts[2], allocationAmount, bonusAllocationAmount, 0, {from: accounts[0], gas: 3500000 })
         });
 
         it('should allow admin update claim status', async function() {
-			await ledger.setCanClaimTokens(true, { from: accounts[0] });
+			const {logs} = await ledger.setCanClaimPresaleTokens(true, { from: accounts[0] });
+			const {event, args} = logs.find(e => e.event === 'CanClaimTokensUpdated')
+			assert.notEqual(event, undefined, "Event can claim tokens updated not fired!");
+			assert.equal(args._type, "canClaimPresaleTokens", "Event can claim tokens updated fired but not called correctly.")
 		});
 
 		it('should not allow invalid contributor claim tokens', async function () {
@@ -188,32 +181,25 @@ contract('Ledger', function (accounts) {
 			ledger = await Ledger.new(token.address, {from: accounts[0], gas: 4500000 })
 			await ledger.setOpsAddress(accounts[0]);
 			await ledger.setAdminAddress(accounts[0]);
-			await token.transfer(ledger.address, 10 * allocationAmount + 6 * bonusAllocationAmount, { from: accounts[0] })
+			await token.transfer(ledger.address, 6 * allocationAmount + 6 * bonusAllocationAmount, { from: accounts[0] })
 		});
 
 		it('should set correct supply values', async function() {
-			await ledger.addAllocation(accounts[1], allocationAmount, bonusAllocationAmount, 2, {from: accounts[0], gas: 3500000 })
-        	await ledger.addAllocation(accounts[1], allocationAmount, bonusAllocationAmount, 2, {from: accounts[0], gas: 3500000 })
-        	await ledger.addAllocation(accounts[1], allocationAmount, bonusAllocationAmount, 2, {from: accounts[0], gas: 3500000 })
-        	await ledger.addAllocation(accounts[1], allocationAmount, bonusAllocationAmount, 2, {from: accounts[0], gas: 3500000 })
-        	await ledger.addAllocation(accounts[1], allocationAmount, bonusAllocationAmount, 2, {from: accounts[0], gas: 3500000 })
-        	await ledger.addAllocation(accounts[2], allocationAmount, bonusAllocationAmount, 2, {from: accounts[0], gas: 3500000 })
-        	await ledger.addAllocation(accounts[3], allocationAmount, 0, 0, {from: accounts[0], gas: 3500000 })
-        	await ledger.addAllocation(accounts[4], allocationAmount, 0, 0, {from: accounts[0], gas: 3500000 })
-        	await ledger.addAllocation(accounts[5], allocationAmount, 0, 0, {from: accounts[0], gas: 3500000 })
-        	await ledger.addAllocation(accounts[6], allocationAmount, 0, 0, {from: accounts[0], gas: 3500000 })
+			await ledger.addAllocation(accounts[1], allocationAmount, bonusAllocationAmount, 1, {from: accounts[0], gas: 3500000 })
+        	await ledger.addAllocation(accounts[1], allocationAmount, bonusAllocationAmount, 1, {from: accounts[0], gas: 3500000 })
+        	await ledger.addAllocation(accounts[1], allocationAmount, bonusAllocationAmount, 1, {from: accounts[0], gas: 3500000 })
+        	await ledger.addAllocation(accounts[1], allocationAmount, bonusAllocationAmount, 1, {from: accounts[0], gas: 3500000 })
+        	await ledger.addAllocation(accounts[1], allocationAmount, bonusAllocationAmount, 1, {from: accounts[0], gas: 3500000 })
+        	await ledger.addAllocation(accounts[2], allocationAmount, bonusAllocationAmount, 1, {from: accounts[0], gas: 3500000 })
 
         	var currentSupply = new BigNumber(await token.balanceOf(ledger.address))
         	var privateAllocations = new BigNumber(await ledger.totalPrivateAllocation())
-        	var publicAllocations = new BigNumber(await ledger.totalPublicAllocation())
 
         	var amount = allocationAmount.mul(6).add(bonusAllocationAmount.mul(6))
         	var isEqual = privateAllocations.equals(amount)
         	assert(isEqual)
-        	amount = allocationAmount.mul(4)
-        	isEqual = publicAllocations.equals(amount)
-        	assert(isEqual)
-        	amount = allocationAmount.mul(10).add(bonusAllocationAmount.mul(6))
+
+        	amount = allocationAmount.mul(6).add(bonusAllocationAmount.mul(6))
         	isEqual = currentSupply.equals(amount)
         	assert(isEqual)
 		});
@@ -228,44 +214,6 @@ contract('Ledger', function (accounts) {
 	 		assert(false, "Did not throw as expected");
 		});
 
-		it('should allow ops update claim status', async function() {
-			await ledger.setCanClaimTokens(true, { from: accounts[0] });
-		});
-
-		it('should allow public contributors claim their tokens', async function () {
-			await ledger.claimTokens({from: accounts[3], gas: 3500000 })
-			await ledger.claimTokens({from: accounts[4], gas: 3500000 })
-			await ledger.claimTokens({from: accounts[5], gas: 3500000 })
-			await ledger.claimTokens({from: accounts[6], gas: 3500000 })
-		});
-
-		it('should transfer the correct amount of J8T to public contributors', async function () {
-
-			// contributor 3
-			var balance = await token.balanceOf(accounts[3])
-			var amount = allocationAmount
-			var isEqual = balance.equals(amount)
-			assert(isEqual)
-
-			// contributor 4
-			balance = await token.balanceOf(accounts[4])
-			amount = allocationAmount
-			isEqual = balance.equals(amount)
-			assert(isEqual)
-
-			// contributor 5
-			balance = await token.balanceOf(accounts[5])
-			amount = allocationAmount
-			isEqual = balance.equals(amount)
-			assert(isEqual)
-
-			// contributor 6
-			balance = await token.balanceOf(accounts[6])
-			amount = allocationAmount
-			isEqual = balance.equals(amount)
-			assert(isEqual)
-		});
-
 		it('should not allow presale contributors claim their tokens', async function () {
 
     		try {
@@ -277,9 +225,22 @@ contract('Ledger', function (accounts) {
 	 		assert(false, "Did not throw as expected");
 		});
 
+		it('should not allow partner contributors claim their tokens', async function () {
+
+    		try {
+				await ledger.claimTokens({from: accounts[1], gas: 3500000 })
+	 		} catch (error) {
+	 			assert(true, `Expected throw, but got ${error} instead`)
+	 			return
+	 		}
+	 		assert(false, "Did not throw as expected");
+		});
+
 		it('should allow ops update claim status', async function() {
-			await ledger.setCanClaimPartnerTokens(true, { from: accounts[0] });
-			await ledger.setCanClaimPresaleTokens(true, { from: accounts[0] });
+			const {logs} = await ledger.setCanClaimPartnerTokens(true, { from: accounts[0] });
+            const {event, args} = logs.find(e => e.event === 'CanClaimTokensUpdated')
+            assert.notEqual(event, undefined, "Event can claim tokens updated not fired!");
+            assert.equal(args._type, "canClaimPartnerTokens", "Event can claim tokens updated fired but not called correctly.")
 		});
 
 		it('should allow private contributors claim their tokens', async function () {
@@ -320,7 +281,10 @@ contract('Ledger', function (accounts) {
 		});
 
 		it('should allow admin update presale bonus claim status', async function() {
-			await ledger.setCanClaimPresaleBonusTokensPhase1(true, { from: accounts[0] });
+            const {logs} = await ledger.setCanClaimPresaleBonusTokensPhase1(true, { from: accounts[0] });
+            const {event, args} = logs.find(e => e.event === 'CanClaimTokensUpdated')
+            assert.notEqual(event, undefined, "Event can claim tokens updated not fired!");
+            assert.equal(args._type, "canClaimPresaleBonusTokensPhase1", "Event can claim tokens updated fired but not called correctly.")
 		});
 
 		it('should not allow partner contributors claim bonus tokens', async function () {
@@ -335,7 +299,10 @@ contract('Ledger', function (accounts) {
 		});
 
 		it('should allow admin update partner bonus claim status', async function() {
-			await ledger.setCanClaimPartnerBonusTokensPhase1(true, { from: accounts[0] });
+            const {logs} = await ledger.setCanClaimPartnerBonusTokensPhase1(true, { from: accounts[0] });
+            const {event, args} = logs.find(e => e.event === 'CanClaimTokensUpdated')
+            assert.notEqual(event, undefined, "Event can claim tokens updated not fired!");
+            assert.equal(args._type, "canClaimPartnerBonusTokensPhase1", "Event can claim tokens updated fired but not called correctly.")
 		});
 
 		it('should allow partner contributors claim phase 1 bonus tokens', async function () {
@@ -365,7 +332,10 @@ contract('Ledger', function (accounts) {
 		});
 
 		it('should allow admin update partner bonus claim status', async function() {
-			await ledger.setCanClaimPartnerBonusTokensPhase2(true, { from: accounts[0] });
+            const {logs} = await ledger.setCanClaimPartnerBonusTokensPhase2(true, { from: accounts[0] });
+            const {event, args} = logs.find(e => e.event === 'CanClaimTokensUpdated')
+            assert.notEqual(event, undefined, "Event can claim tokens updated not fired!");
+            assert.equal(args._type, "canClaimPartnerBonusTokensPhase2", "Event can claim tokens updated fired but not called correctly.")
 		});
 
 		it('should allow partner contributors claim phase 2 bonus tokens', async function () {
@@ -402,44 +372,30 @@ contract('Ledger', function (accounts) {
 			ledger = await Ledger.new(token.address, {from: accounts[0], gas: 4500000 })
 			await ledger.setOpsAddress(accounts[0]);
 			await ledger.setAdminAddress(accounts[0]);
-			await token.transfer(ledger.address, 8 * allocationAmount + bonusAllocationAmount * 2, { from: accounts[0] })
+			await token.transfer(ledger.address, 7 * allocationAmount + bonusAllocationAmount * 2, { from: accounts[0] })
 		});
 
 		it('should add allocations', async function () {
-			await ledger.addAllocation(accounts[1], allocationAmount.mul(5), bonusAllocationAmount, 2, {from: accounts[0], gas: 3500000 })
-			await ledger.addAllocation(accounts[1], allocationAmount.mul(2), bonusAllocationAmount, 1, {from: accounts[0], gas: 3500000 })
-			await ledger.addAllocation(accounts[1], allocationAmount, 0, 0, {from: accounts[0], gas: 3500000 })
+			await ledger.addAllocation(accounts[1], allocationAmount.mul(5), bonusAllocationAmount, 1, {from: accounts[0], gas: 3500000 })
+			await ledger.addAllocation(accounts[1], allocationAmount.mul(2), bonusAllocationAmount, 0, {from: accounts[0], gas: 3500000 })
 
 			var currentSupply = new BigNumber(await token.balanceOf(ledger.address))
         	var privateAllocations = new BigNumber(await ledger.totalPrivateAllocation())
-        	var publicAllocations = new BigNumber(await ledger.totalPublicAllocation())
 
         	var amount = allocationAmount.mul(7).add(bonusAllocationAmount.mul(2))
         	var isEqual = privateAllocations.equals(amount)
         	assert(isEqual)
 
-			amount = allocationAmount
-        	isEqual = publicAllocations.equals(amount)
-        	assert(isEqual)
-
-        	amount = allocationAmount.mul(8).add(bonusAllocationAmount.mul(2))
+        	amount = allocationAmount.mul(7).add(bonusAllocationAmount.mul(2))
         	isEqual = currentSupply.equals(amount)
         	assert(isEqual)
-		});
-
-		it('should set claim and get only public allocation', async function () {
-			await ledger.setCanClaimTokens(true, { from: accounts[0] });
-			await ledger.claimTokens({from: accounts[1], gas: 3500000})
-			var balance = await token.balanceOf(accounts[1])
-			var isEqual = balance.equals(allocationAmount)
-			assert(isEqual)
 		});
 
 		it('should set claim and get only presale allocation', async function () {
 			await ledger.setCanClaimPresaleTokens(true, { from: accounts[0] });
 			await ledger.claimTokens({from: accounts[1], gas: 3500000})
 			var balance = await token.balanceOf(accounts[1])
-			var isEqual = balance.equals(allocationAmount.mul(3))
+			var isEqual = balance.equals(allocationAmount.mul(2))
 			assert(isEqual)
 		});
 
@@ -447,7 +403,7 @@ contract('Ledger', function (accounts) {
 			await ledger.setCanClaimPartnerTokens(true, { from: accounts[0] });
 			await ledger.claimTokens({from: accounts[1], gas: 3500000})
 			var balance = await token.balanceOf(accounts[1])
-			var isEqual = balance.equals(allocationAmount.mul(8))
+			var isEqual = balance.equals(allocationAmount.mul(7))
 			assert(isEqual)
 		});
 
@@ -455,15 +411,19 @@ contract('Ledger', function (accounts) {
 			await ledger.setCanClaimPresaleBonusTokensPhase1(true, { from: accounts[0] });
 			await ledger.claimBonus({from: accounts[1], gas: 3500000})
 			var balance = await token.balanceOf(accounts[1])
-			var isEqual = balance.equals(allocationAmount.mul(8).add(bonusAllocationAmount.mul(0.5)))
+			var isEqual = balance.equals(allocationAmount.mul(7).add(bonusAllocationAmount.mul(0.5)))
 			assert(isEqual)
 		});
 
 		it('should set claim and get presale bonus phase 2 allocation', async function () {
-			await ledger.setCanClaimPresaleBonusTokensPhase2(true, { from: accounts[0] });
+            const {logs} = await ledger.setCanClaimPresaleBonusTokensPhase2(true, { from: accounts[0] });
+            const {event, args} = logs.find(e => e.event === 'CanClaimTokensUpdated')
 			await ledger.claimBonus({from: accounts[1], gas: 3500000})
+            assert.notEqual(event, undefined, "Event can claim tokens updated not fired!");
+            assert.equal(args._type, "canClaimPresaleBonusTokensPhase2", "Event can claim tokens updated fired but not called correctly.")
+
 			var balance = await token.balanceOf(accounts[1])
-			var isEqual = balance.equals(allocationAmount.mul(8).add(bonusAllocationAmount))
+			var isEqual = balance.equals(allocationAmount.mul(7).add(bonusAllocationAmount))
 			assert(isEqual)
 		});
 
@@ -471,7 +431,7 @@ contract('Ledger', function (accounts) {
 			await ledger.setCanClaimPartnerBonusTokensPhase1(true, { from: accounts[0] });
 			await ledger.claimBonus({from: accounts[1], gas: 3500000})
 			var balance = await token.balanceOf(accounts[1])
-			var isEqual = balance.equals(allocationAmount.mul(8).add(bonusAllocationAmount.mul(1.5)))
+			var isEqual = balance.equals(allocationAmount.mul(7).add(bonusAllocationAmount.mul(1.5)))
 			assert(isEqual)
 		});
 
@@ -479,7 +439,7 @@ contract('Ledger', function (accounts) {
 			await ledger.setCanClaimPartnerBonusTokensPhase2(true, { from: accounts[0] });
 			await ledger.claimBonus({from: accounts[1], gas: 3500000})
 			var balance = await token.balanceOf(accounts[1])
-			var isEqual = balance.equals(allocationAmount.mul(8).add(bonusAllocationAmount.mul(2)))
+			var isEqual = balance.equals(allocationAmount.mul(7).add(bonusAllocationAmount.mul(2)))
 			assert(isEqual)
 		});
     });
@@ -491,33 +451,26 @@ contract('Ledger', function (accounts) {
 			ledger = await Ledger.new(token.address, {from: accounts[0], gas: 4500000 })
 			await ledger.setOpsAddress(accounts[0]);
 			await ledger.setAdminAddress(accounts[0]);
-			await token.transfer(ledger.address, 8 * allocationAmount + bonusAllocationAmount * 2, { from: accounts[0] })
+			await token.transfer(ledger.address, 7 * allocationAmount + bonusAllocationAmount * 2, { from: accounts[0] })
 		});
 
 		it('should add allocations', async function () {
-			await ledger.addAllocation(accounts[1], allocationAmount.mul(5), bonusAllocationAmount, 2, {from: accounts[0], gas: 3500000 })
-			await ledger.addAllocation(accounts[1], allocationAmount.mul(2), bonusAllocationAmount, 1, {from: accounts[0], gas: 3500000 })
-			await ledger.addAllocation(accounts[1], allocationAmount, 0, 0, {from: accounts[0], gas: 3500000 })
+			await ledger.addAllocation(accounts[1], allocationAmount.mul(5), bonusAllocationAmount, 1, {from: accounts[0], gas: 3500000 })
+			await ledger.addAllocation(accounts[1], allocationAmount.mul(2), bonusAllocationAmount, 0, {from: accounts[0], gas: 3500000 })
 
 			var currentSupply = new BigNumber(await token.balanceOf(ledger.address))
         	var privateAllocations = new BigNumber(await ledger.totalPrivateAllocation())
-        	var publicAllocations = new BigNumber(await ledger.totalPublicAllocation())
 
         	var amount = allocationAmount.mul(7).add(bonusAllocationAmount.mul(2))
         	var isEqual = privateAllocations.equals(amount)
         	assert(isEqual)
 
-			amount = allocationAmount
-        	isEqual = publicAllocations.equals(amount)
-        	assert(isEqual)
-
-        	amount = allocationAmount.mul(8).add(bonusAllocationAmount.mul(2))
+        	amount = allocationAmount.mul(7).add(bonusAllocationAmount.mul(2))
         	isEqual = currentSupply.equals(amount)
         	assert(isEqual)
 		});
 
 		it('should claim all contributor allocation', async function () {
-			await ledger.setCanClaimTokens(true, { from: accounts[0] });
 			await ledger.setCanClaimPresaleTokens(true, { from: accounts[0] });
 			await ledger.setCanClaimPartnerTokens(true, { from: accounts[0] });
 			await ledger.setCanClaimPresaleBonusTokensPhase1(true, { from: accounts[0] });
@@ -530,7 +483,7 @@ contract('Ledger', function (accounts) {
 			
 			var balanceL = await token.balanceOf(ledger.address)
 			var balance = await token.balanceOf(accounts[1])
-			var isEqual = balance.equals(allocationAmount.mul(8).add(bonusAllocationAmount.mul(2)))
+			var isEqual = balance.equals(allocationAmount.mul(7).add(bonusAllocationAmount.mul(2)))
 			assert(isEqual)
 		});
     });
